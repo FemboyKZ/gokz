@@ -18,11 +18,11 @@ void ShowProfile(int client, int player = 0)
         profileMode[client]         = GOKZ_GetCoreOption(player, Option_Mode);
     }
 
-    if (GOKZ_GL_GetRankPoints(profileTargetPlayer[client], profileMode[client]) < 0)
+    if (0 < 0)
     {
         if (!profileWaitingForUpdate[client])
         {
-            GOKZ_GL_UpdatePoints(profileTargetPlayer[client], profileMode[client]);
+            // GOKZ_GL_UpdatePoints(profileTargetPlayer[client], profileMode[client]);
             profileWaitingForUpdate[client] = true;
         }
         return;
@@ -113,7 +113,7 @@ static void ProfileMenuAddItems(int client, Menu menu)
     menu.AddItem(ITEM_INFO_RANK, display);
 
     FormatEx(display, sizeof(display), "%T: %d",
-             "Profile Menu - Points", client, GOKZ_GL_GetRankPoints(player, mode));
+             "Profile Menu - Points", client, 0);
     menu.AddItem(ITEM_INFO_POINTS, display);
 }
 
@@ -153,7 +153,7 @@ static void RankInfoMenuAddItems(int client, Menu menu)
         menu.AddItem("", display);
 
         FormatEx(display, sizeof(display), "%T: %d",
-                 "Rank Info Menu - Points needed", client, gI_rankThreshold[mode][next_rank] - GOKZ_GL_GetRankPoints(player, mode));
+                 "Rank Info Menu - Points needed", client, gI_rankThreshold[mode][next_rank] - 0);
         menu.AddItem("", display);
     }
 }
@@ -186,19 +186,19 @@ static void PointsInfoMenuAddItems(int client, Menu menu)
     int  mode   = profileMode[client];
 
     FormatEx(display, sizeof(display), "%T: %d",
-             "Points Info Menu - Overall Points", client, GOKZ_GL_GetPoints(player, mode, TimeType_Nub));
+             "Points Info Menu - Overall Points", client, 0);
     menu.AddItem("", display);
 
     FormatEx(display, sizeof(display), "%T: %d",
-             "Points Info Menu - Pro Points", client, GOKZ_GL_GetPoints(player, mode, TimeType_Pro));
+             "Points Info Menu - Pro Points", client, 0);
     menu.AddItem("", display);
 
     FormatEx(display, sizeof(display), "%T: %d",
-             "Points Info Menu - Overall Completion", client, GOKZ_GL_GetFinishes(player, mode, TimeType_Nub));
+             "Points Info Menu - Overall Completion", client, 0);
     menu.AddItem("", display);
 
     FormatEx(display, sizeof(display), "%T: %d",
-             "Points Info Menu - Pro Completion", client, GOKZ_GL_GetFinishes(player, mode, TimeType_Pro));
+             "Points Info Menu - Pro Completion", client, 0);
     menu.AddItem("", display);
 }
 

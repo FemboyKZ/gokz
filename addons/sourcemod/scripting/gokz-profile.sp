@@ -4,7 +4,7 @@
 
 #include <gokz/core>
 #include <gokz/profile>
-#include <gokz/global>
+//#include <gokz/global>
 
 #undef REQUIRE_EXTENSIONS
 #undef REQUIRE_PLUGIN
@@ -228,7 +228,7 @@ public void UpdateRank(int client, int mode)
         return;
     }
 
-    int points = GOKZ_GL_GetRankPoints(client, mode);
+    int points = 0;
     int rank;
     for (rank = 1; rank < RANK_COUNT; rank++)
     {
