@@ -46,6 +46,22 @@
 		"en"		"VIP"
 		"chi"		"会员"
 	}
+	"Options Menu - Tag VIP+"
+	{
+		"en"		"VIP+"
+	}
+	"Options Menu - Tag Contributor"
+	{
+		"en"		"Contributor"
+	}
+	"Options Menu - Tag Custom - boa"
+	{
+		"en"		"boa"
+	}
+	"Options Menu - Tag Custom - Meower"
+	{
+		"en"		"Meower"
+	}
 	
 	//=====[ PROFILE ]=====
 	"Profile Menu - Title"
@@ -129,5 +145,21 @@
 	{
 		"en"		"VIP"
 		"chi"		"会员"
+	}
+	"Tag - VIP+"
+	{
+		"en"		"VIP+"
+	}
+	"Tag - Contributor"
+	{
+		"en"		"Contributor"
+	}
+	"Tag - Custom boa"
+	{
+		"en"		"boa"
+	}
+	"Tag - Custom Meower"
+	{
+		"en"		"Meower"
 	}
 }

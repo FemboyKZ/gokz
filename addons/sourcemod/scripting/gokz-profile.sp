@@ -13,373 +13,391 @@
 #pragma newdecls required
 #pragma semicolon 1
 
-
-
-public Plugin myinfo = 
+public Plugin myinfo =
 {
-	name = "GOKZ Profile", 
-	author = "zealain", 
-	description = "Player profiles and ranks based on local and global data.", 
-	version = GOKZ_VERSION, 
-	url = GOKZ_SOURCE_URL
+    name        = "GOKZ Profile",
+    author      = "zealain",
+    description = "Player profiles and ranks based on local and global data.",
+    version     = GOKZ_VERSION,
+    url         = GOKZ_SOURCE_URL
 };
 
-int gI_Rank[MAXPLAYERS + 1][MODE_COUNT];
+#define UPDATER_URL GOKZ_UPDATER_BASE_URL... "gokz-profile.txt"
+
+int  gI_Rank[MAXPLAYERS + 1][MODE_COUNT];
 bool gB_Localranks;
 bool gB_Chat;
 
 #include "gokz-profile/options.sp"
 #include "gokz-profile/profile.sp"
 
-
-
 // =====[ PLUGIN EVENTS ]=====
-
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
-	CreateNatives();
-	RegPluginLibrary("gokz-profile");
-	return APLRes_Success;
+    CreateNatives();
+    RegPluginLibrary("gokz-profile");
+    return APLRes_Success;
 }
 
 public void OnPluginStart()
 {
-	LoadTranslations("common.phrases");
-	LoadTranslations("gokz-profile.phrases");
-	CreateGlobalForwards();
-	RegisterCommands();
+    LoadTranslations("common.phrases");
+    LoadTranslations("gokz-profile.phrases");
+    CreateGlobalForwards();
+    RegisterCommands();
 }
 
 public void OnAllPluginsLoaded()
 {
-	gB_Localranks = LibraryExists("gokz-localranks");
-	gB_Chat = LibraryExists("gokz-chat");
+    gB_Localranks = LibraryExists("gokz-localranks");
+    gB_Chat       = LibraryExists("gokz-chat");
 
-	for (int client = 1; client <= MaxClients; client++)
-	{
-		if (IsValidClient(client) && !IsFakeClient(client))
-		{
-			UpdateRank(client, GOKZ_GetCoreOption(client, Option_Mode));
-		}
-	}
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsValidClient(client) && !IsFakeClient(client))
+        {
+            UpdateRank(client, GOKZ_GetCoreOption(client, Option_Mode));
+        }
+    }
 
-	TopMenu topMenu;
-	if (LibraryExists("gokz-core") && ((topMenu = GOKZ_GetOptionsTopMenu()) != null))
-	{
-		GOKZ_OnOptionsMenuReady(topMenu);
-	}
+    TopMenu topMenu;
+    if (LibraryExists("gokz-core") && ((topMenu = GOKZ_GetOptionsTopMenu()) != null))
+    {
+        GOKZ_OnOptionsMenuReady(topMenu);
+    }
 }
 
 public void OnLibraryAdded(const char[] name)
 {
-	gB_Localranks = gB_Localranks || StrEqual(name, "gokz-localranks");
-	gB_Chat = gB_Chat || StrEqual(name, "gokz-chat");
+    gB_Localranks = gB_Localranks || StrEqual(name, "gokz-localranks");
+    gB_Chat       = gB_Chat || StrEqual(name, "gokz-chat");
 }
 
 public void OnLibraryRemoved(const char[] name)
 {
-	gB_Localranks = gB_Localranks && !StrEqual(name, "gokz-localranks");
-	gB_Chat = gB_Chat && !StrEqual(name, "gokz-chat");
+    gB_Localranks = gB_Localranks && !StrEqual(name, "gokz-localranks");
+    gB_Chat       = gB_Chat && !StrEqual(name, "gokz-chat");
 }
 
-
-
 // =====[ EVENTS ]=====
-
 public Action OnClientCommandKeyValues(int client, KeyValues kv)
 {
-	// Block clan tag changes - Credit: GoD-Tony (https://forums.alliedmods.net/showpost.php?p=2337679&postcount=6)
-	char cmd[16];
-	if (kv.GetSectionName(cmd, sizeof(cmd)) && StrEqual(cmd, "ClanTagChanged", false))
-	{
-		return Plugin_Handled;
-	}
-	return Plugin_Continue;
+    // Block clan tag changes - Credit: GoD-Tony (https://forums.alliedmods.net/showpost.php?p=2337679&postcount=6)
+    char cmd[16];
+    if (kv.GetSectionName(cmd, sizeof(cmd)) && StrEqual(cmd, "ClanTagChanged", false))
+    {
+        return Plugin_Handled;
+    }
+    return Plugin_Continue;
 }
 
 public void OnRebuildAdminCache(AdminCachePart part)
 {
-	for (int client = 1; client <= MaxClients; client++)
-	{
-		if (IsValidClient(client) && !IsFakeClient(client))
-		{
-			int mode = GOKZ_GetCoreOption(client, Option_Mode);
-			UpdateRank(client, mode);
-		}
-	}
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsValidClient(client) && !IsFakeClient(client))
+        {
+            int mode = GOKZ_GetCoreOption(client, Option_Mode);
+            UpdateRank(client, mode);
+        }
+    }
 }
 
 public void GOKZ_OnOptionsMenuCreated(TopMenu topMenu)
 {
-	OnOptionsMenuCreated_OptionsMenu(topMenu);
+    OnOptionsMenuCreated_OptionsMenu(topMenu);
 }
 
 public void GOKZ_OnOptionsMenuReady(TopMenu topMenu)
 {
-	OnOptionsMenuReady_Options();
-	OnOptionsMenuReady_OptionsMenu(topMenu);
+    OnOptionsMenuReady_Options();
+    OnOptionsMenuReady_OptionsMenu(topMenu);
 }
 
 public void GOKZ_OnOptionsLoaded(int client)
 {
-	if (IsValidClient(client) && !IsFakeClient(client))
-	{
-		int mode = GOKZ_GetCoreOption(client, Option_Mode);
-		UpdateTags(client, gI_Rank[client][mode], mode);
-	}
+    if (IsValidClient(client) && !IsFakeClient(client))
+    {
+        int mode = GOKZ_GetCoreOption(client, Option_Mode);
+        UpdateTags(client, gI_Rank[client][mode], mode);
+    }
 }
 
 public void OnClientConnected(int client)
 {
-	for (int mode = 0; mode < MODE_COUNT; mode++)
-	{
-		gI_Rank[client][mode] = 0;
-	}
-	Profile_OnClientConnected(client);
+    for (int mode = 0; mode < MODE_COUNT; mode++)
+    {
+        gI_Rank[client][mode] = 0;
+    }
+    Profile_OnClientConnected(client);
 }
 
 public void OnClientDisconnect(int client)
 {
-	Profile_OnClientDisconnect(client);
+    Profile_OnClientDisconnect(client);
 }
 
 public void GOKZ_OnOptionChanged(int client, const char[] option, any newValue)
 {
-	Option coreOption;
-	if (GOKZ_IsCoreOption(option, coreOption) && coreOption == Option_Mode)
-	{
-		UpdateRank(client, newValue);
-	}
-	else if (StrEqual(option, gC_ProfileOptionNames[ProfileOption_ShowRankChat], true)
-		|| StrEqual(option, gC_ProfileOptionNames[ProfileOption_ShowRankClanTag], true)
-		|| StrEqual(option, gC_ProfileOptionNames[ProfileOption_TagType], true))
-	{
-		UpdateRank(client, GOKZ_GetCoreOption(client, Option_Mode));
-	}
+    Option coreOption;
+    if (GOKZ_IsCoreOption(option, coreOption) && coreOption == Option_Mode)
+    {
+        UpdateRank(client, newValue);
+    }
+    else if (StrEqual(option, gC_ProfileOptionNames[ProfileOption_ShowRankChat], true)
+             || StrEqual(option, gC_ProfileOptionNames[ProfileOption_ShowRankClanTag], true)
+             || StrEqual(option, gC_ProfileOptionNames[ProfileOption_TagType], true))
+    {
+        UpdateRank(client, GOKZ_GetCoreOption(client, Option_Mode));
+    }
 }
 
 public void GOKZ_GL_OnPointsUpdated(int client, int mode)
 {
-	UpdateRank(client, mode);
-	Profile_OnPointsUpdated(client, mode);
+    UpdateRank(client, mode);
+    Profile_OnPointsUpdated(client, mode);
 }
 
 public void UpdateRank(int client, int mode)
 {
-	if (!IsValidClient(client) || IsFakeClient(client))
-	{
-		return;
-	}
+    if (!IsValidClient(client) || IsFakeClient(client))
+    {
+        return;
+    }
 
-	int tagType = GetAvailableTagTypeOrDefault(client);
+    int tagType = GetAvailableTagTypeOrDefault(client);
 
-	if (tagType != ProfileTagType_Rank)
-	{
-		char clanTag[64], chatTag[32], color[64];
+    if (tagType != ProfileTagType_Rank)
+    {
+        char clanTag[64], chatTag[32], color[64];
 
-		if (tagType == ProfileTagType_Admin)
-		{
-			FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - Admin", client);
-			FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - Admin", client);
-			color = TAG_COLOR_ADMIN;
-		}
-		if (tagType == ProfileTagType_VIP)
-		{
-			FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - VIP", client);
-			FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - VIP", client);
-			color = TAG_COLOR_VIP;
-		}
+        if (tagType == ProfileTagType_Admin)
+        {
+            FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - Admin", client);
+            FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - Admin", client);
+            color = TAG_COLOR_ADMIN;
+        }
+        if (tagType == ProfileTagType_VIP)
+        {
+            FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - VIP", client);
+            FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - VIP", client);
+            color = TAG_COLOR_VIP;
+        }
+        if (tagType == ProfileTagType_VIPPlus)
+        {
+            FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - VIP+", client);
+            FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - VIP+", client);
+            color = TAG_COLOR_VIP_PLUS;
+        }
+        if (tagType == ProfileTagType_Contributor)
+        {
+            FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - Contributor", client);
+            FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - Contributor", client);
+            color = TAG_COLOR_CONTRIBUTOR;
+        }
+        if (tagType == ProfileTagType_Boa)
+        {
+            FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - Custom boa", client);
+            FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - Custom boa", client);
+            color = TAG_COLOR_BOA;
+        }
+        if (tagType == ProfileTagType_Meower)
+        {
+            FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - Custom Meower", client);
+            FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - Custom Meower", client);
+            color = TAG_COLOR_MEOWER;
+        }
 
-		if (GOKZ_GetOption(client, gC_ProfileOptionNames[ProfileOption_ShowRankClanTag]) != ProfileOptionBool_Enabled)
-		{
-			FormatEx(clanTag, sizeof(clanTag), "[%s]", gC_ModeNamesShort[mode]);
-		}
-		CS_SetClientClanTag(client, clanTag);
+        if (GOKZ_GetOption(client, gC_ProfileOptionNames[ProfileOption_ShowRankClanTag]) != ProfileOptionBool_Enabled)
+        {
+            FormatEx(clanTag, sizeof(clanTag), "[%s]", gC_ModeNamesShort[mode]);
+        }
+        CS_SetClientClanTag(client, clanTag);
 
-		if (gB_Chat)
-		{
-			if (GOKZ_GetOption(client, gC_ProfileOptionNames[ProfileOption_ShowRankChat]) == ProfileOptionBool_Enabled)
-			{
-				GOKZ_CH_SetChatTag(client, chatTag, color);
-			}
-			else
-			{
-				GOKZ_CH_SetChatTag(client, "", "{default}");
-			}
-		}
-		return;
-	}
+        if (gB_Chat)
+        {
+            if (GOKZ_GetOption(client, gC_ProfileOptionNames[ProfileOption_ShowRankChat]) == ProfileOptionBool_Enabled)
+            {
+                GOKZ_CH_SetChatTag(client, chatTag, color);
+            }
+            else
+            {
+                GOKZ_CH_SetChatTag(client, "", "{default}");
+            }
+        }
+        return;
+    }
 
-	int points = GOKZ_GL_GetRankPoints(client, mode);
-	int rank;
-	for (rank = 1; rank < RANK_COUNT; rank++)
-	{
-		if (points < gI_rankThreshold[mode][rank])
-		{
-			break;
-		}
-	}
-	rank--;
+    int points = GOKZ_GL_GetRankPoints(client, mode);
+    int rank;
+    for (rank = 1; rank < RANK_COUNT; rank++)
+    {
+        if (points < gI_rankThreshold[mode][rank])
+        {
+            break;
+        }
+    }
+    rank--;
 
-	if (GOKZ_GetCoreOption(client, Option_Mode) == mode)
-	{
-		if (points == -1)
-		{
-			UpdateTags(client, -1, mode);
-		}
-		else
-		{
-			UpdateTags(client, rank, mode);
-		}
-	}
+    if (GOKZ_GetCoreOption(client, Option_Mode) == mode)
+    {
+        if (points == -1)
+        {
+            UpdateTags(client, -1, mode);
+        }
+        else
+        {
+            UpdateTags(client, rank, mode);
+        }
+    }
 
-	if (gI_Rank[client][mode] != rank)
-	{
-		gI_Rank[client][mode] = rank;
-		Call_OnRankUpdated(client, mode, rank);
-	}
+    if (gI_Rank[client][mode] != rank)
+    {
+        gI_Rank[client][mode] = rank;
+        Call_OnRankUpdated(client, mode, rank);
+    }
 }
 
 void UpdateTags(int client, int rank, int mode)
 {
-	char str[64];
-	if (rank != -1 &&
-		GOKZ_GetOption(client, gC_ProfileOptionNames[ProfileOption_ShowRankClanTag]) == ProfileOptionBool_Enabled)
-	{
-		FormatEx(str, sizeof(str), "[%s %s]", gC_ModeNamesShort[mode], gC_rankName[rank]);
-		CS_SetClientClanTag(client, str);
-	}
-	else
-	{
-		FormatEx(str, sizeof(str), "[%s]", gC_ModeNamesShort[mode]);
-		CS_SetClientClanTag(client, str);
-	}
+    char str[64];
+    if (rank != -1 && GOKZ_GetOption(client, gC_ProfileOptionNames[ProfileOption_ShowRankClanTag]) == ProfileOptionBool_Enabled)
+    {
+        FormatEx(str, sizeof(str), "[%s %s]", gC_ModeNamesShort[mode], gC_rankName[rank]);
+        CS_SetClientClanTag(client, str);
+    }
+    else
+    {
+        FormatEx(str, sizeof(str), "[%s]", gC_ModeNamesShort[mode]);
+        CS_SetClientClanTag(client, str);
+    }
 
-	if (gB_Chat)
-	{
-		if (rank != -1 &&
-			GOKZ_GetOption(client, gC_ProfileOptionNames[ProfileOption_ShowRankChat]) == ProfileOptionBool_Enabled)
-		{
-			GOKZ_CH_SetChatTag(client, gC_rankName[rank], gC_rankColor[rank]);
-		}
-		else
-		{
-			GOKZ_CH_SetChatTag(client, "", "{default}");
-		}
-	}
+    if (gB_Chat)
+    {
+        if (rank != -1 && GOKZ_GetOption(client, gC_ProfileOptionNames[ProfileOption_ShowRankChat]) == ProfileOptionBool_Enabled)
+        {
+            GOKZ_CH_SetChatTag(client, gC_rankName[rank], gC_rankColor[rank]);
+        }
+        else
+        {
+            GOKZ_CH_SetChatTag(client, "", "{default}");
+        }
+    }
 }
 
 bool CanUseTagType(int client, int tagType)
 {
-	switch (tagType)
-	{
-		case ProfileTagType_Rank: return true;
-		case ProfileTagType_VIP: return CheckCommandAccess(client, "gokz_flag_vip", ADMFLAG_CUSTOM1);
-		case ProfileTagType_Admin: return CheckCommandAccess(client, "gokz_flag_admin", ADMFLAG_GENERIC);
-		default: return false;
-	}
+    switch (tagType)
+    {
+        case ProfileTagType_Rank: return true;
+        case ProfileTagType_VIP: return CheckCommandAccess(client, "gokz_flag_vip", ADMFLAG_CUSTOM1);
+        case ProfileTagType_VIPPlus: return CheckCommandAccess(client, "gokz_flag_vip_plus", ADMFLAG_CUSTOM2);
+        case ProfileTagType_Contributor: return CheckCommandAccess(client, "gokz_flag_contributor", ADMFLAG_CUSTOM3);
+        case ProfileTagType_Admin: return CheckCommandAccess(client, "gokz_flag_admin", ADMFLAG_GENERIC);
+        case ProfileTagType_Boa: return CheckCommandAccess(client, "gokz_flag_boa", ADMFLAG_CUSTOM4);
+        case ProfileTagType_Meower: return CheckCommandAccess(client, "gokz_flag_meower", ADMFLAG_CUSTOM5);
+        default: return false;
+    }
 }
 
 int GetAvailableTagTypeOrDefault(int client)
 {
-	int tagType = GOKZ_GetOption(client, gC_ProfileOptionNames[ProfileOption_TagType]);
-	if (!CanUseTagType(client, tagType))
-	{
-		return ProfileTagType_Rank;
-	}
+    int tagType = GOKZ_GetOption(client, gC_ProfileOptionNames[ProfileOption_TagType]);
+    if (!CanUseTagType(client, tagType))
+    {
+        return ProfileTagType_Rank;
+    }
 
-	return tagType;
+    return tagType;
 }
 
 // =====[ COMMANDS ]=====
 
 void RegisterCommands()
 {
-	RegConsoleCmd("sm_profile", CommandProfile, "[KZ] Show the profile of a player. Usage: !profile <player>");
-	RegConsoleCmd("sm_p", CommandProfile, "[KZ] Show the profile of a player. Usage: !p <player>");
-	RegConsoleCmd("sm_profileoptions", CommandProfileOptions, "[KZ] Show the profile options.");
-	RegConsoleCmd("sm_pfo", CommandProfileOptions, "[KZ] Show the profile options.");
-	RegConsoleCmd("sm_ranks", CommandRanks, "[KZ] Show all the available ranks.");
+    RegConsoleCmd("sm_profile", CommandProfile, "[KZ] Show the profile of a player. Usage: !profile <player>");
+    RegConsoleCmd("sm_p", CommandProfile, "[KZ] Show the profile of a player. Usage: !p <player>");
+    RegConsoleCmd("sm_profileoptions", CommandProfileOptions, "[KZ] Show the profile options.");
+    RegConsoleCmd("sm_pfo", CommandProfileOptions, "[KZ] Show the profile options.");
+    RegConsoleCmd("sm_ranks", CommandRanks, "[KZ] Show all the available ranks.");
 }
 
 public Action CommandProfile(int client, int args)
 {
-	if (args == 0)
-	{
-		ShowProfile(client, client);
-	}
-	else
-	{
-		char playerName[64];
-		GetCmdArgString(playerName, sizeof(playerName));
-		int player = FindTarget(client, playerName, true, false);
-		if (player != -1)
-		{
-			ShowProfile(client, player);
-		}
-	}
-	return Plugin_Handled;
+    if (args == 0)
+    {
+        ShowProfile(client, client);
+    }
+    else
+    {
+        char playerName[64];
+        GetCmdArgString(playerName, sizeof(playerName));
+        int player = FindTarget(client, playerName, true, false);
+        if (player != -1)
+        {
+            ShowProfile(client, player);
+        }
+    }
+    return Plugin_Handled;
 }
 
 public Action CommandProfileOptions(int client, int args)
 {
-	DisplayProfileOptionsMenu(client);
-	return Plugin_Handled;
+    DisplayProfileOptionsMenu(client);
+    return Plugin_Handled;
 }
 
 public Action CommandRanks(int client, int args)
 {
-	char rankBuffer[256];
-	char buffer[256];
-	int mode = GOKZ_GetCoreOption(client, Option_Mode);
+    char rankBuffer[256];
+    char buffer[256];
+    int  mode = GOKZ_GetCoreOption(client, Option_Mode);
 
-	Format(buffer, sizeof(buffer), "%s: ", gC_ModeNamesShort[mode]);
+    Format(buffer, sizeof(buffer), "%s: ", gC_ModeNamesShort[mode]);
 
-	for (int i = 0; i < RANK_COUNT; i++) {
-		Format(rankBuffer, sizeof(rankBuffer), "%s%s (%d) ", gC_rankColor[i], gC_rankName[i], gI_rankThreshold[mode][i]);
-		StrCat(buffer, sizeof(buffer), rankBuffer);
+    for (int i = 0; i < RANK_COUNT; i++)
+    {
+        Format(rankBuffer, sizeof(rankBuffer), "%s%s (%d) ", gC_rankColor[i], gC_rankName[i], gI_rankThreshold[mode][i]);
+        StrCat(buffer, sizeof(buffer), rankBuffer);
 
-		if (i > 0 && i % 3 == 0) {
-			GOKZ_PrintToChat(client, true, buffer);
-			Format(buffer, sizeof(buffer), "%s: ", gC_ModeNamesShort[mode]);
-		}
-	}
+        if (i > 0 && i % 3 == 0)
+        {
+            GOKZ_PrintToChat(client, true, buffer);
+            Format(buffer, sizeof(buffer), "%s: ", gC_ModeNamesShort[mode]);
+        }
+    }
 
-	GOKZ_PrintToChat(client, true, buffer);
+    GOKZ_PrintToChat(client, true, buffer);
 
-	return Plugin_Handled;
+    return Plugin_Handled;
 }
-
 
 // =====[ FORWARDS ]=====
 
 static GlobalForward H_OnRankUpdated;
 
-
-void CreateGlobalForwards()
+void                 CreateGlobalForwards()
 {
-	H_OnRankUpdated = new GlobalForward("GOKZ_PF_OnRankUpdated", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
+    H_OnRankUpdated = new GlobalForward("GOKZ_PF_OnRankUpdated", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
 }
 
 void Call_OnRankUpdated(int client, int mode, int rank)
 {
-	Call_StartForward(H_OnRankUpdated);
-	Call_PushCell(client);
-	Call_PushCell(mode);
-	Call_PushCell(rank);
-	Call_Finish();
+    Call_StartForward(H_OnRankUpdated);
+    Call_PushCell(client);
+    Call_PushCell(mode);
+    Call_PushCell(rank);
+    Call_Finish();
 }
-
-
 
 // =====[ NATIVES ]=====
 
 void CreateNatives()
 {
-	CreateNative("GOKZ_PF_GetRank", Native_GetRank);
+    CreateNative("GOKZ_PF_GetRank", Native_GetRank);
 }
 
 public int Native_GetRank(Handle plugin, int numParams)
 {
-	return gI_Rank[GetNativeCell(1)][GetNativeCell(2)];
+    return gI_Rank[GetNativeCell(1)][GetNativeCell(2)];
 }
