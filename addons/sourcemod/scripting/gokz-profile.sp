@@ -207,6 +207,12 @@ public void UpdateRank(int client, int mode)
             FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - Custom Meower", client);
             color = TAG_COLOR_MEOWER;
         }
+        if (tagType == ProfileTagType_Cat)
+        {
+            FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - Custom Cat", client);
+            FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - Custom Cat", client);
+            color = TAG_COLOR_CAT;
+        }
 
         if (GOKZ_GetOption(client, gC_ProfileOptionNames[ProfileOption_ShowRankClanTag]) != ProfileOptionBool_Enabled)
         {
@@ -296,6 +302,7 @@ bool CanUseTagType(int client, int tagType)
         case ProfileTagType_Admin: return CheckCommandAccess(client, "gokz_flag_admin", ADMFLAG_GENERIC);
         case ProfileTagType_Boa: return CheckCommandAccess(client, "gokz_flag_boa", ADMFLAG_CUSTOM4);
         case ProfileTagType_Meower: return CheckCommandAccess(client, "gokz_flag_meower", ADMFLAG_CUSTOM5);
+        case ProfileTagType_Cat: return CheckCommandAccess(client, "gokz_flag_cat", ADMFLAG_CUSTOM6);
         default: return false;
     }
 }

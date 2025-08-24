@@ -62,6 +62,10 @@
 	{
 		"en"		"Meower"
 	}
+	"Options Menu - Tag Custom - Cat"
+	{
+		"en"		"cat"
+	}
 	
 	//=====[ PROFILE ]=====
 	"Profile Menu - Title"
@@ -161,5 +165,9 @@
 	"Tag - Custom Meower"
 	{
 		"en"		"Meower"
+	}
+	"Tag - Custom Cat"
+	{
+		"en"		"cat"
 	}
 }
