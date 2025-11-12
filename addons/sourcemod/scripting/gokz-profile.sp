@@ -4,10 +4,10 @@
 
 #include <gokz/core>
 #include <gokz/profile>
-#include <gokz/global>
 
 #undef REQUIRE_EXTENSIONS
 #undef REQUIRE_PLUGIN
+#include <gokz/global>
 #include <gokz/chat>
 
 #pragma newdecls required
@@ -27,6 +27,7 @@ public Plugin myinfo =
 int  gI_Rank[MAXPLAYERS + 1][MODE_COUNT];
 bool gB_Localranks;
 bool gB_Chat;
+bool gB_Global;
 
 #include "gokz-profile/options.sp"
 #include "gokz-profile/profile.sp"
@@ -51,6 +52,7 @@ public void OnAllPluginsLoaded()
 {
     gB_Localranks = LibraryExists("gokz-localranks");
     gB_Chat       = LibraryExists("gokz-chat");
+    gB_Global     = LibraryExists("gokz-global");
 
     for (int client = 1; client <= MaxClients; client++)
     {
@@ -71,12 +73,14 @@ public void OnLibraryAdded(const char[] name)
 {
     gB_Localranks = gB_Localranks || StrEqual(name, "gokz-localranks");
     gB_Chat       = gB_Chat || StrEqual(name, "gokz-chat");
+    gB_Global     = gB_Global || StrEqual(name, "gokz-global");
 }
 
 public void OnLibraryRemoved(const char[] name)
 {
     gB_Localranks = gB_Localranks && !StrEqual(name, "gokz-localranks");
     gB_Chat       = gB_Chat && !StrEqual(name, "gokz-chat");
+    gB_Global     = gB_Global && !StrEqual(name, "gokz-global");
 }
 
 // =====[ EVENTS ]=====
@@ -154,6 +158,11 @@ public void GOKZ_OnOptionChanged(int client, const char[] option, any newValue)
 
 public void GOKZ_GL_OnPointsUpdated(int client, int mode)
 {
+    if (!gB_Global)
+    {
+        return;
+    }
+    
     UpdateRank(client, mode);
     Profile_OnPointsUpdated(client, mode);
 }
@@ -232,6 +241,13 @@ public void UpdateRank(int client, int mode)
                 GOKZ_CH_SetChatTag(client, "", "{default}");
             }
         }
+        return;
+    }
+
+    // If gokz-global is not loaded, just set basic tags without rank
+    if (!gB_Global)
+    {
+        UpdateTags(client, -1, mode);
         return;
     }
 
@@ -384,7 +400,7 @@ public Action CommandRanks(int client, int args)
 
 static GlobalForward H_OnRankUpdated;
 
-void                 CreateGlobalForwards()
+void CreateGlobalForwards()
 {
     H_OnRankUpdated = new GlobalForward("GOKZ_PF_OnRankUpdated", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
 }
