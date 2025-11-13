@@ -143,6 +143,14 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 	OnPlayerRunCmdPost_BhopTracking(client, buttons, cmdnum);
 }
 
+public void GOKZ_OnJumpValidated(int client, bool jumped, bool ladderJump, bool jumpbug)
+{
+	if (jumpbug)
+	{
+		OnJumpValidated_BhopTracking(client, gI_CmdNum[client]);
+	}
+}
+
 public MRESReturn DHooks_OnTeleport(int client, Handle params)
 {
 	// Parameter 1 not null means origin affected

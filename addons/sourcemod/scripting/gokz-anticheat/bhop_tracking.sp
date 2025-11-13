@@ -124,12 +124,7 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 		 && cmdnum >= gI_BhopLastTakeoffCmdnum[client] + AC_MAX_BUTTON_SAMPLES * 2
 		 && gB_LastLandingWasValid[client])
 	{
-		gB_BhopHitPerf[client][nextIndex] = Movement_GetHitPerf(client);
-		gI_BhopPreJumpInputs[client][nextIndex] = CountJumpInputs(client);
-		gI_BhopLastRecordedBhopCmdnum[client] = cmdnum;
-		gB_BhopPostJumpInputsPending[client] = true;
-		gB_BindExceptionPending[client] = false;
-		gB_BindExceptionPostPending[client] = false;
+		RecordJump(client, nextIndex, cmdnum);
 	}
 	
 	// Bind exception
@@ -197,9 +192,35 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 	}
 }
 
+void OnJumpValidated_BhopTracking(int client, int cmdnum)
+{
+	if (gCV_sv_autobunnyhopping.BoolValue)
+	{
+		return;
+	}
+	
+	int nextIndex = NextIndex(gI_BhopIndex[client], AC_MAX_BHOP_SAMPLES);
+	
+	// Record jumpbug if we have enough button samples since last takeoff
+	if (cmdnum >= gI_BhopLastTakeoffCmdnum[client] + AC_MAX_BUTTON_SAMPLES * 2)
+	{
+		RecordJump(client, nextIndex, cmdnum);
+	}
+}
+
 
 
 // =====[ PRIVATE ]=====
+
+static void RecordJump(int client, int nextIndex, int cmdnum)
+{
+	gB_BhopHitPerf[client][nextIndex] = Movement_GetHitPerf(client);
+	gI_BhopPreJumpInputs[client][nextIndex] = CountJumpInputs(client);
+	gI_BhopLastRecordedBhopCmdnum[client] = cmdnum;
+	gB_BhopPostJumpInputsPending[client] = true;
+	gB_BindExceptionPending[client] = false;
+	gB_BindExceptionPostPending[client] = false;
+}
 
 static void CheckForBhopMacro(int client)
 {
