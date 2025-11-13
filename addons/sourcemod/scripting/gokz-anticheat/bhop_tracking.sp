@@ -105,6 +105,36 @@ void OnClientPutInServer_BhopTracking(int client)
 	ResetBhopStats(client);
 }
 
+void OnJumpValidated_RecordJumpbug(int client, int cmdnum)
+{
+	if (gCV_sv_autobunnyhopping.BoolValue)
+	{
+		return;
+	}
+	
+	int nextIndex = NextIndex(gI_BhopIndex[client], AC_MAX_BHOP_SAMPLES);
+	
+	// If a bhop was already recorded on this tick, update it to be a jumpbug
+	// This is fine because a jumpbug IS a bhop, just a special type
+	bool alreadyRecorded = (gI_BhopLastRecordedBhopCmdnum[client] == cmdnum);
+	
+	if (alreadyRecorded)
+	{
+		// A bhop was already recorded this tick - just update the perf status
+		// The pre/post jump inputs are already correct from the bhop recording
+		gB_BhopHitPerf[client][nextIndex] = Movement_GetHitPerf(client);
+		// Don't call RecordJump again - the bhop recording already set everything up
+	}
+	else
+	{
+		// New jumpbug (not preceded by a bhop recording), record it normally
+		RecordJump(client, nextIndex, cmdnum);
+	}
+	
+	// Clear bind exception since we successfully recorded the jumpbug
+	gB_BindExceptionPending[client] = false;
+}
+
 void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 {
 	if (gCV_sv_autobunnyhopping.BoolValue)
@@ -118,17 +148,32 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 	RecordButtons(client, buttons);
 	
 	// If bhop was last tick, then record the pre bhop inputs.
-	// Require two times the button sample size since the last
-	// takeoff to avoid pre and post bhop input overlap.
-	if (HitBhop(client, cmdnum)
-		 && cmdnum >= gI_BhopLastTakeoffCmdnum[client] + AC_MAX_BUTTON_SAMPLES * 2
-		 && gB_LastLandingWasValid[client])
+	// Require sufficient time since the last RECORDED bhop to avoid pre and post bhop input overlap.
+	// Use AC_MAX_BUTTON_SAMPLES to allow faster consecutive bhops while still preventing overlap.
+	bool hitBhop = HitBhop(client, cmdnum);
+	
+	// Check if enough time has passed since last recorded jump to avoid input overlap
+	// Use half the button sample size to allow faster consecutive jumps
+	bool enoughTimePassed = (gI_BhopLastRecordedBhopCmdnum[client] == 0 || 
+		cmdnum >= gI_BhopLastRecordedBhopCmdnum[client] + (AC_MAX_BUTTON_SAMPLES / 2));
+	
+	// Track if we recorded a jump this tick (for bind exception prevention)
+	bool recordedJump = false;
+	
+	// Bhops require valid landing and enough time passed
+	if (hitBhop && enoughTimePassed && gB_LastLandingWasValid[client])
 	{
 		RecordJump(client, nextIndex, cmdnum);
+		recordedJump = true;
 	}
+	// Note: Jumpbugs are also recorded via the GOKZ_OnJumpValidated forward
+	// If a jumpbug occurs on the same tick as a bhop, the forward will overwrite the bhop data
 	
-	// Bind exception
-	if (gB_BindExceptionPending[client] && cmdnum > Movement_GetLandingCmdNum(client) + AC_MAX_BHOP_GROUND_TICKS)
+	// Bind exception - only trigger if we haven't already recorded a jump this tick
+	// Also skip if this is a jumpbug tick (jumpbugs are handled by the forward)
+	// Also skip if we're still waiting for post-inputs from a previous jump (to prevent double-recording)
+	if (gB_BindExceptionPending[client] && cmdnum > Movement_GetLandingCmdNum(client) + AC_MAX_BHOP_GROUND_TICKS
+		&& !recordedJump && !gB_JumpbugThisTick[client] && !gB_BhopPostJumpInputsPending[client])
 	{
 		gB_BhopHitPerf[client][nextIndex] = false;
 		gI_BhopPreJumpInputs[client][nextIndex] = -1; // Special value for binded jumps
@@ -187,24 +232,12 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 		// before landing and none after landing. We require the one input to be right
 		// before the jump to make it a lot harder to fake a binded jump when doing
 		// a regular longjump.
-		gB_BindExceptionPending[client] = (CountJumpInputs(client, AC_BINDEXCEPTION_SAMPLES) == 1 && CountJumpInputs(client, AC_MAX_BUTTON_SAMPLES) == 1);
+		// Only check for bind exception if we have enough button samples AND this wasn't a jumpbug
+		// (jumpbugs naturally have 1 input before the jump, so they shouldn't trigger bind exception)
+		bool wasJumpbug = Movement_GetJumpbugged(client);
+		gB_BindExceptionPending[client] = !wasJumpbug && gI_ButtonCount[client] >= AC_MAX_BUTTON_SAMPLES 
+			&& (CountJumpInputs(client, AC_BINDEXCEPTION_SAMPLES) == 1 && CountJumpInputs(client, AC_MAX_BUTTON_SAMPLES) == 1);
 		gB_BindExceptionPostPending[client] = false;
-	}
-}
-
-void OnJumpValidated_BhopTracking(int client, int cmdnum)
-{
-	if (gCV_sv_autobunnyhopping.BoolValue)
-	{
-		return;
-	}
-	
-	int nextIndex = NextIndex(gI_BhopIndex[client], AC_MAX_BHOP_SAMPLES);
-	
-	// Record jumpbug if we have enough button samples since last takeoff
-	if (cmdnum >= gI_BhopLastTakeoffCmdnum[client] + AC_MAX_BUTTON_SAMPLES * 2)
-	{
-		RecordJump(client, nextIndex, cmdnum);
 	}
 }
 
@@ -215,7 +248,16 @@ void OnJumpValidated_BhopTracking(int client, int cmdnum)
 static void RecordJump(int client, int nextIndex, int cmdnum)
 {
 	gB_BhopHitPerf[client][nextIndex] = Movement_GetHitPerf(client);
-	gI_BhopPreJumpInputs[client][nextIndex] = CountJumpInputs(client);
+	int preInputs = CountJumpInputs(client);
+	
+	// If we have no jump inputs but there's a bind exception pending, 
+	// this might be a false positive - clear the exception and use 0 instead of -1
+	if (preInputs == 0 && gB_BindExceptionPending[client])
+	{
+		gB_BindExceptionPending[client] = false;
+	}
+	
+	gI_BhopPreJumpInputs[client][nextIndex] = preInputs;
 	gI_BhopLastRecordedBhopCmdnum[client] = cmdnum;
 	gB_BhopPostJumpInputsPending[client] = true;
 	gB_BindExceptionPending[client] = false;

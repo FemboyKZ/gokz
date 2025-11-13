@@ -58,6 +58,8 @@ ConVar gCV_gokz_autoban_duration_bhop_hack;
 ConVar gCV_gokz_autoban_duration_bhop_macro;
 ConVar gCV_sv_autobunnyhopping;
 
+bool gB_JumpbugThisTick[MAXPLAYERS + 1];
+
 #include "gokz-anticheat/api.sp"
 #include "gokz-anticheat/bhop_tracking.sp"
 #include "gokz-anticheat/commands.sp"
@@ -147,7 +149,13 @@ public void GOKZ_OnJumpValidated(int client, bool jumped, bool ladderJump, bool 
 {
 	if (jumpbug)
 	{
-		OnJumpValidated_BhopTracking(client, gI_CmdNum[client]);
+		// Set the flag and immediately try to record the jumpbug
+		gB_JumpbugThisTick[client] = true;
+		OnJumpValidated_RecordJumpbug(client, gI_CmdNum[client]);
+	}
+	else
+	{
+		gB_JumpbugThisTick[client] = false;
 	}
 }
 
