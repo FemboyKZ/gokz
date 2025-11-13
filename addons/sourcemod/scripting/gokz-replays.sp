@@ -158,7 +158,7 @@ public Action HookTriggers(int entity, int other)
 	return Plugin_Continue;
 }
 
-public Action Hook_SayText2(UserMsg msg_id, any msg, const int[] players, int playersNum, bool reliable, bool init)
+public Action Hook_SayText2(UserMsg msg_id, Protobuf msg, const int[] players, int playersNum, bool reliable, bool init)
 {
 	// Name change supression
 	// Credit to shavit's simple bhop timer - https://github.com/shavitush/bhoptimer
