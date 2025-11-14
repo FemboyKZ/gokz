@@ -43,6 +43,7 @@ int gI_Buttons[MAXPLAYERS + 1][AC_MAX_BUTTON_SAMPLES];
 
 int gI_BhopCount[MAXPLAYERS + 1];
 int gI_BhopIndex[MAXPLAYERS + 1];
+int gI_BhopPendingIndex[MAXPLAYERS + 1]; // The index currently being recorded (before finalization)
 int gI_BhopLastTakeoffCmdnum[MAXPLAYERS + 1];
 int gI_BhopLastRecordedBhopCmdnum[MAXPLAYERS + 1];
 bool gB_BhopHitPerf[MAXPLAYERS + 1][AC_MAX_BHOP_SAMPLES];

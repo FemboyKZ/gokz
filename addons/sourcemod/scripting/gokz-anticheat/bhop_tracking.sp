@@ -112,8 +112,6 @@ void OnJumpValidated_RecordJumpbug(int client, int cmdnum)
 		return;
 	}
 	
-	int nextIndex = NextIndex(gI_BhopIndex[client], AC_MAX_BHOP_SAMPLES);
-	
 	// If a bhop was already recorded on this tick, update it to be a jumpbug
 	// This is fine because a jumpbug IS a bhop, just a special type
 	bool alreadyRecorded = (gI_BhopLastRecordedBhopCmdnum[client] == cmdnum);
@@ -121,14 +119,17 @@ void OnJumpValidated_RecordJumpbug(int client, int cmdnum)
 	if (alreadyRecorded)
 	{
 		// A bhop was already recorded this tick - just update the perf status
+		// Use the stored pending index to avoid recalculation
 		// The pre/post jump inputs are already correct from the bhop recording
-		gB_BhopHitPerf[client][nextIndex] = Movement_GetHitPerf(client);
+		gB_BhopHitPerf[client][gI_BhopPendingIndex[client]] = Movement_GetHitPerf(client);
 		// gB_BhopPostJumpInputsPending is already true from the bhop recording,
 		// so the index will be advanced when post-inputs are collected
 	}
 	else
 	{
 		// New jumpbug (not preceded by a bhop recording), record it normally
+		int nextIndex = NextIndex(gI_BhopIndex[client], AC_MAX_BHOP_SAMPLES);
+		gI_BhopPendingIndex[client] = nextIndex;
 		RecordJump(client, nextIndex, cmdnum);
 		// RecordJump sets gB_BhopPostJumpInputsPending[client] = true,
 		// so the index will be advanced when post-inputs are collected
@@ -144,8 +145,6 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 	{
 		return;
 	}
-	
-	int nextIndex = NextIndex(gI_BhopIndex[client], AC_MAX_BHOP_SAMPLES);
 	
 	// Record buttons BEFORE checking for bhop
 	RecordButtons(client, buttons);
@@ -168,6 +167,8 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 	// Bhops require valid landing and enough time passed
 	if (hitBhop && enoughTimePassed && gB_LastLandingWasValid[client])
 	{
+		int nextIndex = NextIndex(gI_BhopIndex[client], AC_MAX_BHOP_SAMPLES);
+		gI_BhopPendingIndex[client] = nextIndex;
 		RecordJump(client, nextIndex, cmdnum);
 		recordedJump = true;
 	}
@@ -180,6 +181,8 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 	if (gB_BindExceptionPending[client] && cmdnum > Movement_GetLandingCmdNum(client) + AC_MAX_BHOP_GROUND_TICKS
 		&& !recordedJump && !gB_JumpbugThisTick[client] && !gB_BhopPostJumpInputsPending[client])
 	{
+		int nextIndex = NextIndex(gI_BhopIndex[client], AC_MAX_BHOP_SAMPLES);
+		gI_BhopPendingIndex[client] = nextIndex;
 		gB_BhopHitPerf[client][nextIndex] = false;
 		gI_BhopPreJumpInputs[client][nextIndex] = -1; // Special value for binded jumps
 		gI_BhopLastRecordedBhopCmdnum[client] = cmdnum;
@@ -191,9 +194,10 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 	// Record post bhop inputs once enough ticks have passed
 	if (gB_BhopPostJumpInputsPending[client] && cmdnum == gI_BhopLastRecordedBhopCmdnum[client] + AC_MAX_BUTTON_SAMPLES)
 	{
-		gI_BhopPostJumpInputs[client][nextIndex] = CountJumpInputs(client);
+		// Use the stored pending index to finalize the recording
+		gI_BhopPostJumpInputs[client][gI_BhopPendingIndex[client]] = CountJumpInputs(client);
 		gB_BhopPostJumpInputsPending[client] = false;
-		gI_BhopIndex[client] = nextIndex;
+		gI_BhopIndex[client] = gI_BhopPendingIndex[client];
 		gI_BhopCount[client]++;
 		CheckForBhopMacro(client);
 		gB_BindExceptionPostPending[client] = false;
@@ -210,10 +214,10 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 			// Finalize the previous jump before starting a new one
 			if (gB_BhopPostJumpInputsPending[client])
 			{
-				int nextIndex = NextIndex(gI_BhopIndex[client], AC_MAX_BHOP_SAMPLES);
+				// Use the stored pending index for early finalization
 				// Record whatever post-inputs we have so far (even if incomplete)
-				gI_BhopPostJumpInputs[client][nextIndex] = CountJumpInputs(client);
-				gI_BhopIndex[client] = nextIndex;
+				gI_BhopPostJumpInputs[client][gI_BhopPendingIndex[client]] = CountJumpInputs(client);
+				gI_BhopIndex[client] = gI_BhopPendingIndex[client];
 				gI_BhopCount[client]++;
 				CheckForBhopMacro(client);
 			}
@@ -363,6 +367,7 @@ static void ResetBhopStats(int client)
 	gI_ButtonsIndex[client] = 0;
 	gI_BhopCount[client] = 0;
 	gI_BhopIndex[client] = 0;
+	gI_BhopPendingIndex[client] = 0;
 	gI_BhopLastTakeoffCmdnum[client] = 0;
 	gI_BhopLastRecordedBhopCmdnum[client] = 0;
 	gB_BhopPostJumpInputsPending[client] = false;
