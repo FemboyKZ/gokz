@@ -179,6 +179,12 @@ public int Native_GetPostJumpInputs(Handle plugin, int numParams)
 
 static void SortByRecentBool(const bool[] input, int inputSize, bool[] buffer, int bufferSize, int index)
 {
+	if (index < 0 || index >= inputSize)
+	{
+		// If index is invalid, just return empty buffer
+		return;
+	}
+	
 	int reorderedIndex = 0;
 	for (int i = index; reorderedIndex < bufferSize && i >= 0; i--)
 	{
