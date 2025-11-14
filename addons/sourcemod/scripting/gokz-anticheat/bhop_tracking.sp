@@ -107,6 +107,11 @@ void OnClientPutInServer_BhopTracking(int client)
 
 void OnJumpValidated_RecordJumpbug(int client, int cmdnum)
 {
+	if (gCV_sv_autobunnyhopping.BoolValue)
+	{
+		return;
+	}
+    
 	// If a bhop was already recorded on this tick, update it to be a jumpbug
 	// This is fine because a jumpbug IS a bhop, just a special type
 	bool alreadyRecorded = (gI_BhopLastRecordedBhopCmdnum[client] == cmdnum);
@@ -144,6 +149,11 @@ void OnJumpValidated_RecordJumpbug(int client, int cmdnum)
 
 void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 {
+	if (gCV_sv_autobunnyhopping.BoolValue)
+	{
+		return;
+	}
+
 	// Record buttons BEFORE checking for bhop
 	RecordButtons(client, buttons);
 	
