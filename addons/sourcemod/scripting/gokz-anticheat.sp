@@ -142,6 +142,8 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 		return;
 	}
 	
+	gB_JumpbugThisTick[client] = false;
+	
 	OnPlayerRunCmdPost_BhopTracking(client, buttons, cmdnum);
 }
 
@@ -152,10 +154,6 @@ public void GOKZ_OnJumpValidated(int client, bool jumped, bool ladderJump, bool 
 		// Set the flag and immediately try to record the jumpbug
 		gB_JumpbugThisTick[client] = true;
 		OnJumpValidated_RecordJumpbug(client, gI_CmdNum[client]);
-	}
-	else
-	{
-		gB_JumpbugThisTick[client] = false;
 	}
 }
 
