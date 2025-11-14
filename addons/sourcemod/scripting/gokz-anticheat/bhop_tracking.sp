@@ -148,23 +148,34 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 	RecordButtons(client, buttons);
 	
 	// If bhop was last tick, then record the pre bhop inputs.
-	// Require sufficient time since the last RECORDED bhop to avoid pre and post bhop input overlap.
-	// Must wait at least AC_MAX_BUTTON_SAMPLES * 2 ticks to prevent overlap:
-	// - Previous jump's post-inputs: cmdnum to cmdnum + AC_MAX_BUTTON_SAMPLES
-	// - Current jump's pre-inputs: cmdnum - AC_MAX_BUTTON_SAMPLES to cmdnum
-	// - These ranges don't overlap when jumps are AC_MAX_BUTTON_SAMPLES * 2 ticks apart
 	bool hitBhop = HitBhop(client, cmdnum);
 	
-	// Check if enough time has passed since last recorded jump to avoid input overlap
-	bool enoughTimePassed = (gI_BhopLastRecordedBhopCmdnum[client] == 0 || 
-		cmdnum >= gI_BhopLastRecordedBhopCmdnum[client] + (AC_MAX_BUTTON_SAMPLES * 2));
+	// Cooldown check: require minimum ticks between bhops to prevent spam from head bonks
+	// Allow 8 ticks minimum between jumps (should accommodate both 64 and 128 tick)
+	int ticksSinceLastJump = cmdnum - gI_BhopLastRecordedBhopCmdnum[client];
+	bool onCooldown = (gI_BhopLastRecordedBhopCmdnum[client] > 0 && ticksSinceLastJump < 8);
 	
 	// Track if we recorded a jump this tick (for bind exception prevention)
 	bool recordedJump = false;
 	
-	// Bhops require valid landing and enough time passed
-	if (hitBhop && enoughTimePassed && gB_LastLandingWasValid[client])
+	// Bhops require valid landing
+	if (hitBhop && gB_LastLandingWasValid[client] && !onCooldown)
 	{
+		// If there's a pending bhop, finalize it first
+		if (gB_BhopPostJumpInputsPending[client])
+		{
+			int pendingIdx = gI_BhopPendingIndex[client];
+			if (pendingIdx >= 0 && pendingIdx < AC_MAX_BHOP_SAMPLES)
+			{
+				// Finalize with whatever inputs we have
+				gI_BhopPostJumpInputs[client][pendingIdx] = CountJumpInputs(client);
+				gI_BhopIndex[client] = pendingIdx;
+				gI_BhopCount[client]++;
+				CheckForBhopMacro(client);
+			}
+			gB_BhopPostJumpInputsPending[client] = false;
+		}
+		// Now record the new bhop
 		int nextIndex = NextIndex(gI_BhopIndex[client], AC_MAX_BHOP_SAMPLES);
 		// Validate index is within bounds before storing
 		if (nextIndex >= 0 && nextIndex < AC_MAX_BHOP_SAMPLES)
@@ -218,11 +229,8 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 	{
 		gI_BhopLastTakeoffCmdnum[client] = cmdnum;
 		gB_BindExceptionPending[client] = false;
-		if (gB_BhopPostJumpInputsPending[client] || gB_BindExceptionPostPending[client])
-		{
-			gB_BhopPostJumpInputsPending[client] = false;
-			gB_BindExceptionPostPending[client] = false;
-		}
+		// Note: Pending bhops are now auto-finalized when a new bhop is recorded
+		// No need to discard here since the bhop recording section handles it
 	}
 	
 	if (JustLanded(client, cmdnum))
