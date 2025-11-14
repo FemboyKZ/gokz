@@ -258,7 +258,11 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 		// a regular longjump.
 		// Only check for bind exception if we have enough button samples AND this wasn't a jumpbug
 		// (jumpbugs naturally have 1 input before the jump, so they shouldn't trigger bind exception)
-		bool wasJumpbug = Movement_GetJumpbugged(client);
+		bool wasJumpbug = false;
+		if (IsValidClient(client))
+		{
+    		wasJumpbug = Movement_GetJumpbugged(client);
+		}
 		gB_BindExceptionPending[client] = !wasJumpbug && gI_ButtonCount[client] >= AC_MAX_BUTTON_SAMPLES 
 			&& (CountJumpInputs(client, AC_BINDEXCEPTION_SAMPLES) == 1 && CountJumpInputs(client, AC_MAX_BUTTON_SAMPLES) == 1);
 		gB_BindExceptionPostPending[client] = false;
