@@ -123,12 +123,15 @@ void OnJumpValidated_RecordJumpbug(int client, int cmdnum)
 		// A bhop was already recorded this tick - just update the perf status
 		// The pre/post jump inputs are already correct from the bhop recording
 		gB_BhopHitPerf[client][nextIndex] = Movement_GetHitPerf(client);
-		// Don't call RecordJump again - the bhop recording already set everything up
+		// gB_BhopPostJumpInputsPending is already true from the bhop recording,
+		// so the index will be advanced when post-inputs are collected
 	}
 	else
 	{
 		// New jumpbug (not preceded by a bhop recording), record it normally
 		RecordJump(client, nextIndex, cmdnum);
+		// RecordJump sets gB_BhopPostJumpInputsPending[client] = true,
+		// so the index will be advanced when post-inputs are collected
 	}
 	
 	// Clear bind exception since we successfully recorded the jumpbug
@@ -199,8 +202,19 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 	{
 		gI_BhopLastTakeoffCmdnum[client] = cmdnum;
 		gB_BindExceptionPending[client] = false;
-		if (gB_BindExceptionPostPending[client])
+		// If a new jump occurs before post-inputs were collected, we need to finalize the pending jump
+		if (gB_BindExceptionPostPending[client] || gB_BhopPostJumpInputsPending[client])
 		{
+			// Finalize the previous jump before starting a new one
+			if (gB_BhopPostJumpInputsPending[client])
+			{
+				int nextIndex = NextIndex(gI_BhopIndex[client], AC_MAX_BHOP_SAMPLES);
+				// Record whatever post-inputs we have so far (even if incomplete)
+				gI_BhopPostJumpInputs[client][nextIndex] = CountJumpInputs(client);
+				gI_BhopIndex[client] = nextIndex;
+				gI_BhopCount[client]++;
+				CheckForBhopMacro(client);
+			}
 			gB_BhopPostJumpInputsPending[client] = false;
 			gB_BindExceptionPostPending[client] = false;
 		}
