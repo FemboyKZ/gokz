@@ -143,9 +143,11 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 		return;
 	}
 	
-	gB_JumpbugThisTick[client] = false;
-	
+	// Process bhop tracking (this may check gB_JumpbugThisTick which was set by GOKZ_OnJumpValidated)
 	OnPlayerRunCmdPost_BhopTracking(client, buttons, cmdnum);
+	
+	// Reset the jumpbug flag at the END of the tick, after all processing is complete
+	gB_JumpbugThisTick[client] = false;
 }
 
 public void GOKZ_OnJumpValidated(int client, bool jumped, bool ladderJump, bool jumpbug)
