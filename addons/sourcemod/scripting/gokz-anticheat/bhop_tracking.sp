@@ -149,11 +149,6 @@ void OnJumpValidated_RecordJumpbug(int client, int cmdnum)
 
 void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 {
-	if (gCV_sv_autobunnyhopping.BoolValue)
-	{
-		return;
-	}
-	
 	// Record buttons BEFORE checking for bhop
 	RecordButtons(client, buttons);
 	
@@ -228,7 +223,7 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 	{
 		gI_BhopLastTakeoffCmdnum[client] = cmdnum;
 		gB_BindExceptionPending[client] = false;
-		if (gB_BindExceptionPostPending[client])
+		if (gB_BhopPostJumpInputsPending[client] || gB_BindExceptionPostPending[client])
 		{
 			gB_BhopPostJumpInputsPending[client] = false;
 			gB_BindExceptionPostPending[client] = false;
