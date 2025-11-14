@@ -152,13 +152,15 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 	
 	// If bhop was last tick, then record the pre bhop inputs.
 	// Require sufficient time since the last RECORDED bhop to avoid pre and post bhop input overlap.
-	// Use AC_MAX_BUTTON_SAMPLES to allow faster consecutive bhops while still preventing overlap.
+	// Must wait at least AC_MAX_BUTTON_SAMPLES * 2 ticks to prevent overlap:
+	// - Previous jump's post-inputs: cmdnum to cmdnum + AC_MAX_BUTTON_SAMPLES
+	// - Current jump's pre-inputs: cmdnum - AC_MAX_BUTTON_SAMPLES to cmdnum
+	// - These ranges don't overlap when jumps are AC_MAX_BUTTON_SAMPLES * 2 ticks apart
 	bool hitBhop = HitBhop(client, cmdnum);
 	
 	// Check if enough time has passed since last recorded jump to avoid input overlap
-	// Use half the button sample size to allow faster consecutive jumps
 	bool enoughTimePassed = (gI_BhopLastRecordedBhopCmdnum[client] == 0 || 
-		cmdnum >= gI_BhopLastRecordedBhopCmdnum[client] + (AC_MAX_BUTTON_SAMPLES / 2));
+		cmdnum >= gI_BhopLastRecordedBhopCmdnum[client] + (AC_MAX_BUTTON_SAMPLES * 2));
 	
 	// Track if we recorded a jump this tick (for bind exception prevention)
 	bool recordedJump = false;
