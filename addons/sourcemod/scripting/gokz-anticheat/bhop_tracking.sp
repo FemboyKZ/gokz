@@ -208,19 +208,8 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 	{
 		gI_BhopLastTakeoffCmdnum[client] = cmdnum;
 		gB_BindExceptionPending[client] = false;
-		// If a new jump occurs before post-inputs were collected, we need to finalize the pending jump
-		if (gB_BindExceptionPostPending[client] || gB_BhopPostJumpInputsPending[client])
+		if (gB_BindExceptionPostPending[client])
 		{
-			// Finalize the previous jump before starting a new one
-			if (gB_BhopPostJumpInputsPending[client])
-			{
-				// Use the stored pending index for early finalization
-				// Record whatever post-inputs we have so far (even if incomplete)
-				gI_BhopPostJumpInputs[client][gI_BhopPendingIndex[client]] = CountJumpInputs(client);
-				gI_BhopIndex[client] = gI_BhopPendingIndex[client];
-				gI_BhopCount[client]++;
-				CheckForBhopMacro(client);
-			}
 			gB_BhopPostJumpInputsPending[client] = false;
 			gB_BindExceptionPostPending[client] = false;
 		}
