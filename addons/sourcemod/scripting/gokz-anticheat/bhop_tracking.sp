@@ -107,11 +107,6 @@ void OnClientPutInServer_BhopTracking(int client)
 
 void OnJumpValidated_RecordJumpbug(int client, int cmdnum)
 {
-	if (gCV_sv_autobunnyhopping.BoolValue)
-	{
-		return;
-	}
-	
 	// If a bhop was already recorded on this tick, update it to be a jumpbug
 	// This is fine because a jumpbug IS a bhop, just a special type
 	bool alreadyRecorded = (gI_BhopLastRecordedBhopCmdnum[client] == cmdnum);
@@ -180,7 +175,7 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 		}
 	}
 	// Note: Jumpbugs are also recorded via the GOKZ_OnJumpValidated forward
-	// If a jumpbug occurs on the same tick as a bhop, the forward will overwrite the bhop data
+	// If a jumpbug occurs on the same tick as a bhop, the forward will update the bhop data
 	
 	// Bind exception - only trigger if we haven't already recorded a jump this tick
 	// Also skip if this is a jumpbug tick (jumpbugs are handled by the forward)
