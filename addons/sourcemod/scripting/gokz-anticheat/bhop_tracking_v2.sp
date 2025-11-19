@@ -340,33 +340,6 @@ static char[] GenerateBhopBanStatsV2(int client, int sampleSize)
 	return stats;
 }
 
-static char[] GenerateScrollPatternExV2(int client, int sampleSize = AC_MAX_BHOP_SAMPLES)
-{
-	char report[512];
-	int maxIndex = IntMin(gI_BhopCountV2[client], sampleSize);
-	bool[] perfs = new bool[maxIndex];
-	GOKZ_AC_GetHitPerfV2(client, perfs, maxIndex);
-	int[] jumpInputs = new int[maxIndex];
-	GOKZ_AC_GetJumpInputsV2(client, jumpInputs, maxIndex);
-	int[] preJumpInputs = new int[maxIndex];
-	GOKZ_AC_GetPreJumpInputsV2(client, preJumpInputs, maxIndex);
-	int[] postJumpInputs = new int[maxIndex];
-	GOKZ_AC_GetPostJumpInputsV2(client, postJumpInputs, maxIndex);
-	
-	for (int i = 0; i < maxIndex; i++)
-	{
-		Format(report, sizeof(report), "%s(%d%s%d)", 
-			report, 
-			preJumpInputs[i], 
-			perfs[i] ? "*" : " ", 
-			postJumpInputs[i]);
-	}
-	
-	TrimString(report);
-	
-	return report;
-}
-
 static int CheckForRepeatingJumpInputsCountV2(int client, int threshold, int sampleSize = AC_MAX_BHOP_SAMPLES)
 {
 	int maxIndex = IntMin(gI_BhopCountV2[client], sampleSize);
