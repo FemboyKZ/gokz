@@ -123,8 +123,11 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 		return;
 	}
 
+	// Record buttons BEFORE checking for bhop
+	RecordButtonsV2(client, buttons);
+
 	// If bhop was last tick, then record the pre bhop inputs.
-	bool hitBhop = HitBhop(client, cmdnum);
+	bool hitBhop = HitBhopV2(client, cmdnum);
 	
 	// Cooldown check: require minimum ticks between bhops to prevent spam from head bonks
 	// Allow 8 ticks minimum between jumps (should accommodate both 64 and 128 tick)
@@ -144,7 +147,7 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 			if (pendingIdx >= 0 && pendingIdx < AC_MAX_BHOP_SAMPLES)
 			{
 				// Finalize with whatever inputs we have
-				gI_BhopPostJumpInputsV2[client][pendingIdx] = CountJumpInputs(client);
+				gI_BhopPostJumpInputsV2[client][pendingIdx] = CountJumpInputsV2(client);
 				gI_BhopIndexV2[client] = pendingIdx;
 				gI_BhopCountV2[client]++;
 				CheckForBhopMacroV2(client);
@@ -191,7 +194,7 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 		int pendingIdx = gI_BhopPendingIndexV2[client];
 		if (pendingIdx >= 0 && pendingIdx < AC_MAX_BHOP_SAMPLES)
 		{
-			gI_BhopPostJumpInputsV2[client][pendingIdx] = CountJumpInputs(client);
+			gI_BhopPostJumpInputsV2[client][pendingIdx] = CountJumpInputsV2(client);
 			gI_BhopIndexV2[client] = pendingIdx;
 			gI_BhopCountV2[client]++;
 			CheckForBhopMacroV2(client);
@@ -208,7 +211,7 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 		// No need to discard here since the bhop recording section handles it
 	}
 	
-	if (JustLanded(client, cmdnum))
+	if (JustLandedV2(client, cmdnum))
 	{
 		// Only check for bind exception if we have enough button samples AND this wasn't a jumpbug
 		// (jumpbugs naturally have 1 input before the jump, so they shouldn't trigger bind exception)
@@ -218,7 +221,7 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
     		wasJumpbug = Movement_GetJumpbugged(client);
 		}
 		gB_BindExceptionPendingV2[client] = !wasJumpbug && gI_ButtonCount[client] >= AC_MAX_BUTTON_SAMPLES 
-			&& (CountJumpInputs(client, AC_BINDEXCEPTION_SAMPLES) == 1 && CountJumpInputs(client, AC_MAX_BUTTON_SAMPLES) == 1);
+			&& (CountJumpInputsV2(client, AC_BINDEXCEPTION_SAMPLES) == 1 && CountJumpInputsV2(client, AC_MAX_BUTTON_SAMPLES) == 1);
 		gB_BindExceptionPostPendingV2[client] = false;
 	}
 }
@@ -230,7 +233,7 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 static void RecordJumpV2(int client, int nextIndex, int cmdnum)
 {
 	gB_BhopHitPerfV2[client][nextIndex] = Movement_GetHitPerf(client);
-	int preInputs = CountJumpInputs(client);
+	int preInputs = CountJumpInputsV2(client);
 	
 	// If we have no jump inputs but there's a bind exception pending, 
 	// this might be a false positive - clear the exception and use 0 instead of -1
@@ -341,6 +344,49 @@ static int CheckForRepeatingJumpInputsCountV2(int client, int threshold, int sam
 	return -1; // -1 if no repeating jump input found
 }
 
+// Returns true if ther was a jump last tick and was within a number of ticks after landing
+static bool HitBhopv2(int client, int cmdnum)
+{
+	return JustJumpedv2(client, cmdnum) && Movement_GetTakeoffCmdNum(client) - Movement_GetLandingCmdNum(client) <= AC_MAX_BHOP_GROUND_TICKS;
+}
+
+static bool JustJumpedv2(int client, int cmdnum)
+{
+	return Movement_GetJumped(client) && Movement_GetTakeoffCmdNum(client) == cmdnum;
+}
+
+static bool JustLandedV2(int client, int cmdnum)
+{
+	return Movement_GetLandingCmdNum(client) == cmdnum;
+}
+
+// Records current button inputs
+void RecordButtons(int client, int buttons)
+{
+	gI_ButtonsIndex[client] = NextIndex(gI_ButtonsIndex[client], AC_MAX_BUTTON_SAMPLES);
+	gI_Buttons[client][gI_ButtonsIndex[client]] = buttons;
+	gI_ButtonCount[client]++;
+}
+
+// Counts the number of times buttons went from !IN_JUMP to IN_JUMP
+static int CountJumpInputsV2(int client, int sampleSize = AC_MAX_BUTTON_SAMPLES)
+{
+	int[] recentButtons = new int[sampleSize];
+	SortByRecent(gI_Buttons[client], AC_MAX_BUTTON_SAMPLES, recentButtons, sampleSize, gI_ButtonsIndex[client]);
+	int maxIndex = IntMin(gI_ButtonCount[client], sampleSize);
+	int jumps = 0;
+	
+	for (int i = 0; i < maxIndex - 1; i++)
+	{
+		// If buttons went from !IN_JUMP to IN_JUMP
+		if (!(recentButtons[i + 1] & IN_JUMP) && recentButtons[i] & IN_JUMP)
+		{
+			jumps++;
+		}
+	}
+	return jumps;
+} 
+
 // Reset the tracked bhop stats of the client (V2)
 static void ResetBhopStatsV2(int client)
 {
@@ -368,25 +414,31 @@ static void SuspectPlayerV2(int client, ACReason reason, const char[] reasonDeta
 		}
 	}
 	
+	// NOTE: V2 does NOT mark as cheater in local DB to keep it isolated from Global API
+	// NOTE: V2 does NOT call GOKZ_AC_OnPlayerSuspected forward (no Global API ban)
+	
 	// Apply local/SBPP ban (NOT Global API)
 	if (gCV_gokz_autoban.BoolValue)
 	{
+		char banReason[256];
+		char kickMessage[256];
 		int duration = (reason == ACReason_BhopHack) ? gCV_gokz_autoban_duration_bhop_hack.IntValue : gCV_gokz_autoban_duration_bhop_macro.IntValue;
-		char reasonStr[256];
-		FormatEx(reasonStr, sizeof(reasonStr), "[FKZ AC] %s - %s", reasonDetails, reasonStats);
 		
-		// Try SourceBans++ first, then local DB
+		FormatEx(banReason, sizeof(banReason), "[FKZ] gokz-anticheat - %s", reasonDetails);
+		FormatEx(kickMessage, sizeof(kickMessage), "You have been banned by FKZ AC detection.\nContact the server administrator for more info.\n%s", reasonStats);
+		
+		// Use standard ban methods (local/SBPP only, no Global API)
 		if (gB_SourceBansPP)
 		{
-			SBPP_BanPlayer(0, client, duration, reasonStr);
+			SBPP_BanPlayer(0, client, duration, banReason);
 		}
-		else if (gB_GOKZLocalDB)
+		else if (gB_SourceBans)
 		{
-			GOKZ_DB_SaveAnticheatBan(GetSteamAccountID(client), duration, reason, reasonDetails, reasonStats);
+			SBBanPlayer(0, client, duration, banReason);
 		}
 		else
 		{
-			BanClient(client, duration, BANFLAG_AUTO, reasonStr, reasonStr);
+			BanClient(client, duration, BANFLAG_AUTO, banReason, kickMessage, "gokz-anticheat-v2", 0);
 		}
 	}
 }
