@@ -179,6 +179,12 @@ public int Native_GetPostJumpInputs(Handle plugin, int numParams)
 
 static void SortByRecentBool(const bool[] input, int inputSize, bool[] buffer, int bufferSize, int index)
 {
+	if (index < 0 || index >= inputSize)
+	{
+		// If index is invalid, just return empty buffer
+		return;
+	}
+	
 	int reorderedIndex = 0;
 	for (int i = index; reorderedIndex < bufferSize && i >= 0; i--)
 	{
@@ -190,4 +196,108 @@ static void SortByRecentBool(const bool[] input, int inputSize, bool[] buffer, i
 		buffer[reorderedIndex] = input[i];
 		reorderedIndex++;
 	}
-} 
+}
+
+
+
+// =====[ V2 API FUNCTIONS ]===== 
+// Internal use only - not exposed as natives
+
+int GOKZ_AC_GetSampleSizeV2(int client)
+{
+	return IntMin(gI_BhopCountV2[client], AC_MAX_BHOP_SAMPLES);
+}
+
+int GOKZ_AC_GetHitPerfV2(int client, bool[] perfs, int sampleSize)
+{
+	sampleSize = IntMin(GOKZ_AC_GetSampleSizeV2(client), sampleSize);
+	if (sampleSize == 0)
+	{
+		return 0;
+	}
+	SortByRecentBool(gB_BhopHitPerfV2[client], AC_MAX_BHOP_SAMPLES, perfs, sampleSize, gI_BhopIndexV2[client]);
+	return sampleSize;
+}
+
+int GOKZ_AC_GetPerfCountV2(int client, int sampleSize)
+{
+	sampleSize = IntMin(GOKZ_AC_GetSampleSizeV2(client), sampleSize);
+	if (sampleSize == 0)
+	{
+		return 0;
+	}
+
+	bool[] perfs = new bool[sampleSize];
+	GOKZ_AC_GetHitPerfV2(client, perfs, sampleSize);
+
+	int perfCount = 0;
+	for (int i = 0; i < sampleSize; i++)
+	{
+		if (perfs[i])
+		{
+			perfCount++;
+		}
+	}
+	return perfCount;
+}
+
+int GOKZ_AC_GetJumpInputsV2(int client, int[] jumpInputs, int sampleSize)
+{
+	sampleSize = IntMin(GOKZ_AC_GetSampleSizeV2(client), sampleSize);
+	if (sampleSize == 0)
+	{
+		return 0;
+	}
+
+	int[] preJumpInputs = new int[sampleSize];
+	SortByRecent(gI_BhopPreJumpInputsV2[client], AC_MAX_BHOP_SAMPLES, preJumpInputs, sampleSize, gI_BhopIndexV2[client]);
+	int[] postJumpInputs = new int[sampleSize];
+	SortByRecent(gI_BhopPostJumpInputsV2[client], AC_MAX_BHOP_SAMPLES, postJumpInputs, sampleSize, gI_BhopIndexV2[client]);
+
+	for (int i = 0; i < sampleSize; i++)
+	{
+		jumpInputs[i] = preJumpInputs[i] + postJumpInputs[i];
+	}
+	return sampleSize;
+}
+
+float GOKZ_AC_GetAverageJumpInputsV2(int client, int sampleSize)
+{
+	sampleSize = IntMin(GOKZ_AC_GetSampleSizeV2(client), sampleSize);
+	if (sampleSize == 0)
+	{
+		return 0.0;
+	}
+
+	int[] jumpInputs = new int[sampleSize];
+	GOKZ_AC_GetJumpInputsV2(client, jumpInputs, sampleSize);
+
+	int jumpInputCount = 0;
+	for (int i = 0; i < sampleSize; i++)
+	{
+		jumpInputCount += jumpInputs[i];
+	}
+	return float(jumpInputCount) / float(sampleSize);
+}
+
+int GOKZ_AC_GetPreJumpInputsV2(int client, int[] preJumpInputs, int sampleSize)
+{
+	sampleSize = IntMin(GOKZ_AC_GetSampleSizeV2(client), sampleSize);
+	if (sampleSize == 0)
+	{
+		return 0;
+	}
+	SortByRecent(gI_BhopPreJumpInputsV2[client], AC_MAX_BHOP_SAMPLES, preJumpInputs, sampleSize, gI_BhopIndexV2[client]);
+	return sampleSize;
+}
+
+int GOKZ_AC_GetPostJumpInputsV2(int client, int[] postJumpInputs, int sampleSize)
+{
+	sampleSize = IntMin(GOKZ_AC_GetSampleSizeV2(client), sampleSize);
+	if (sampleSize == 0)
+	{
+		return 0;
+	}
+	SortByRecent(gI_BhopPostJumpInputsV2[client], AC_MAX_BHOP_SAMPLES, postJumpInputs, sampleSize, gI_BhopIndexV2[client]);
+	return sampleSize;
+}

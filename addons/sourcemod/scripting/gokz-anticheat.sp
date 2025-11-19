@@ -41,6 +41,7 @@ int gI_ButtonCount[MAXPLAYERS + 1];
 int gI_ButtonsIndex[MAXPLAYERS + 1];
 int gI_Buttons[MAXPLAYERS + 1][AC_MAX_BUTTON_SAMPLES];
 
+// Legacy tracking (original method, sends to Global API)
 int gI_BhopCount[MAXPLAYERS + 1];
 int gI_BhopIndex[MAXPLAYERS + 1];
 int gI_BhopLastTakeoffCmdnum[MAXPLAYERS + 1];
@@ -53,6 +54,23 @@ bool gB_LastLandingWasValid[MAXPLAYERS + 1];
 bool gB_BindExceptionPending[MAXPLAYERS + 1];
 bool gB_BindExceptionPostPending[MAXPLAYERS + 1];
 
+// V2 tracking (jumpbug-aware method, local/SBPP bans only)
+int gI_ButtonCountV2[MAXPLAYERS + 1];
+int gI_ButtonsIndexV2[MAXPLAYERS + 1];
+int gI_ButtonsV2[MAXPLAYERS + 1][AC_MAX_BUTTON_SAMPLES];
+
+int gI_BhopCountV2[MAXPLAYERS + 1];
+int gI_BhopIndexV2[MAXPLAYERS + 1];
+int gI_BhopPendingIndexV2[MAXPLAYERS + 1];
+int gI_BhopLastTakeoffCmdnumV2[MAXPLAYERS + 1];
+int gI_BhopLastRecordedBhopCmdnumV2[MAXPLAYERS + 1];
+bool gB_BhopHitPerfV2[MAXPLAYERS + 1][AC_MAX_BHOP_SAMPLES];
+int gI_BhopPreJumpInputsV2[MAXPLAYERS + 1][AC_MAX_BHOP_SAMPLES];
+int gI_BhopPostJumpInputsV2[MAXPLAYERS + 1][AC_MAX_BHOP_SAMPLES];
+bool gB_BhopPostJumpInputsPendingV2[MAXPLAYERS + 1];
+bool gB_BindExceptionPendingV2[MAXPLAYERS + 1];
+bool gB_BindExceptionPostPendingV2[MAXPLAYERS + 1];
+
 ConVar gCV_gokz_autoban;
 ConVar gCV_gokz_autoban_duration_bhop_hack;
 ConVar gCV_gokz_autoban_duration_bhop_macro;
@@ -62,6 +80,7 @@ bool gB_JumpbugThisTick[MAXPLAYERS + 1];
 
 #include "gokz-anticheat/api.sp"
 #include "gokz-anticheat/bhop_tracking.sp"
+#include "gokz-anticheat/bhop_tracking_v2.sp"
 #include "gokz-anticheat/commands.sp"
 
 
@@ -126,6 +145,7 @@ public void OnLibraryRemoved(const char[] name)
 public void OnClientPutInServer(int client)
 {
 	OnClientPutInServer_BhopTracking(client);
+	OnClientPutInServer_BhopTrackingV2(client);
 	HookClientEvents(client);
 }
 
@@ -142,20 +162,22 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 		return;
 	}
 	
-	OnPlayerRunCmdPost_BhopTracking(client, buttons, cmdnum);
+	// Process both tracking systems
+	OnPlayerRunCmdPost_BhopTracking(client, buttons, cmdnum);     // Legacy (Global API)
+	OnPlayerRunCmdPost_BhopTrackingV2(client, buttons, cmdnum);   // V2 (Local/SBPP only)
+	
+	// Reset the jumpbug flag at the END of the tick, after all processing is complete
+	gB_JumpbugThisTick[client] = false;
 }
 
 public void GOKZ_OnJumpValidated(int client, bool jumped, bool ladderJump, bool jumpbug)
 {
 	if (jumpbug)
 	{
-		// Set the flag and immediately try to record the jumpbug
+		// Set the flag for V2 tracking
 		gB_JumpbugThisTick[client] = true;
-		OnJumpValidated_RecordJumpbug(client, gI_CmdNum[client]);
-	}
-	else
-	{
-		gB_JumpbugThisTick[client] = false;
+		// Only V2 tracks jumpbugs directly
+		OnJumpValidated_RecordJumpbugV2(client, gI_CmdNum[client]);
 	}
 }
 
