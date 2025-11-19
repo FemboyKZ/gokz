@@ -55,9 +55,14 @@ bool gB_BindExceptionPending[MAXPLAYERS + 1];
 bool gB_BindExceptionPostPending[MAXPLAYERS + 1];
 
 // V2 tracking (jumpbug-aware method, local/SBPP bans only)
+int gI_ButtonCountV2[MAXPLAYERS + 1];
+int gI_ButtonsIndexV2[MAXPLAYERS + 1];
+int gI_ButtonsV2[MAXPLAYERS + 1][AC_MAX_BUTTON_SAMPLES];
+
 int gI_BhopCountV2[MAXPLAYERS + 1];
 int gI_BhopIndexV2[MAXPLAYERS + 1];
 int gI_BhopPendingIndexV2[MAXPLAYERS + 1];
+int gI_BhopLastTakeoffCmdnumV2[MAXPLAYERS + 1];
 int gI_BhopLastRecordedBhopCmdnumV2[MAXPLAYERS + 1];
 bool gB_BhopHitPerfV2[MAXPLAYERS + 1][AC_MAX_BHOP_SAMPLES];
 int gI_BhopPreJumpInputsV2[MAXPLAYERS + 1][AC_MAX_BHOP_SAMPLES];

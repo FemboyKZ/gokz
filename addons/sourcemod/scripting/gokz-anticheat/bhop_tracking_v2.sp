@@ -67,6 +67,34 @@ char[] GenerateScrollPatternV2(int client, int sampleSize = AC_MAX_BHOP_SAMPLES,
 	return report;
 }
 
+// Generate 'scroll pattern' report showing pre and post inputs instead
+char[] GenerateScrollPatternExV2(int client, int sampleSize = AC_MAX_BHOP_SAMPLES)
+{
+	char report[512];
+	int maxIndex = IntMin(gI_BhopCountV2[client], sampleSize);
+	bool[] perfs = new bool[maxIndex];
+	GOKZ_AC_GetHitPerfV2(client, perfs, maxIndex);
+	int[] jumpInputs = new int[maxIndex];
+	GOKZ_AC_GetJumpInputsV2(client, jumpInputs, maxIndex);
+	int[] preJumpInputs = new int[maxIndex];
+	GOKZ_AC_GetPreJumpInputsV2(client, preJumpInputs, maxIndex);
+	int[] postJumpInputs = new int[maxIndex];
+	GOKZ_AC_GetPostJumpInputsV2(client, postJumpInputs, maxIndex);
+	
+	for (int i = 0; i < maxIndex; i++)
+	{
+		Format(report, sizeof(report), "%s(%d%s%d)", 
+			report, 
+			preJumpInputs[i], 
+			perfs[i] ? "*" : " ", 
+			postJumpInputs[i]);
+	}
+	
+	TrimString(report);
+	
+	return report;
+}
+
 // =====[ EVENTS ]=====
 
 void OnClientPutInServer_BhopTrackingV2(int client)
@@ -204,8 +232,9 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 	}
 	
 	// Record last jump takeoff time
-	if (JustJumped(client, cmdnum))
+	if (JustJumpedV2(client, cmdnum))
 	{
+		gI_BhopLastTakeoffCmdnumV2[client] = cmdnum;
 		gB_BindExceptionPendingV2[client] = false;
 		// Note: Pending bhops are now auto-finalized when a new bhop is recorded
 		// No need to discard here since the bhop recording section handles it
@@ -213,6 +242,30 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 	
 	if (JustLandedV2(client, cmdnum))
 	{
+        // These conditions exist to reduce false positives.
+		
+		// Telehopping is when the player bunnyhops out of a teleport that has a
+		// destination very close to the ground. This will, more than usual,
+		// result in a perfect bunnyhop. This is alleviated by checking if the
+		// player's origin was affected by a teleport last tick.
+		
+		// When a player is pressing up against a slope but not ascending it (e.g.
+		// palm trees on kz_adv_cursedjourney), they will switch between on ground
+		// and off ground frequently, which means that if they manage to jump, the
+		// jump will be recorded as a perfect bunnyhop. To ignore this, we check
+		// the jump is more than 1 tick duration.
+		
+		gB_LastLandingWasValid[client] = cmdnum - gI_LastOriginTeleportCmdNum[client] > 1
+		 && cmdnum - Movement_GetTakeoffCmdNum(client) > 1;
+		
+		// You can still crouch-bind VNL jumps and some people just don't know that
+		// it doesn't work with the other modes in GOKZ. This can cause false positives
+		// if the player uses the bind for bhops and mostly presses it too early or
+		// exactly on time rather than too late. This is supposed to reduce those by
+		// detecting jumps where you don't get a bhop and have exactly one jump input
+		// before landing and none after landing. We require the one input to be right
+		// before the jump to make it a lot harder to fake a binded jump when doing
+		// a regular longjump.
 		// Only check for bind exception if we have enough button samples AND this wasn't a jumpbug
 		// (jumpbugs naturally have 1 input before the jump, so they shouldn't trigger bind exception)
 		bool wasJumpbug = false;
@@ -220,7 +273,7 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 		{
     		wasJumpbug = Movement_GetJumpbugged(client);
 		}
-		gB_BindExceptionPendingV2[client] = !wasJumpbug && gI_ButtonCount[client] >= AC_MAX_BUTTON_SAMPLES 
+		gB_BindExceptionPendingV2[client] = !wasJumpbug && gI_ButtonCountV2[client] >= AC_MAX_BUTTON_SAMPLES 
 			&& (CountJumpInputsV2(client, AC_BINDEXCEPTION_SAMPLES) == 1 && CountJumpInputsV2(client, AC_MAX_BUTTON_SAMPLES) == 1);
 		gB_BindExceptionPostPendingV2[client] = false;
 	}
@@ -345,12 +398,12 @@ static int CheckForRepeatingJumpInputsCountV2(int client, int threshold, int sam
 }
 
 // Returns true if ther was a jump last tick and was within a number of ticks after landing
-static bool HitBhopv2(int client, int cmdnum)
+static bool HitBhopV2(int client, int cmdnum)
 {
-	return JustJumpedv2(client, cmdnum) && Movement_GetTakeoffCmdNum(client) - Movement_GetLandingCmdNum(client) <= AC_MAX_BHOP_GROUND_TICKS;
+	return JustJumpedV2(client, cmdnum) && Movement_GetTakeoffCmdNum(client) - Movement_GetLandingCmdNum(client) <= AC_MAX_BHOP_GROUND_TICKS;
 }
 
-static bool JustJumpedv2(int client, int cmdnum)
+static bool JustJumpedV2(int client, int cmdnum)
 {
 	return Movement_GetJumped(client) && Movement_GetTakeoffCmdNum(client) == cmdnum;
 }
@@ -361,19 +414,19 @@ static bool JustLandedV2(int client, int cmdnum)
 }
 
 // Records current button inputs
-void RecordButtons(int client, int buttons)
+void RecordButtonsV2(int client, int buttons)
 {
-	gI_ButtonsIndex[client] = NextIndex(gI_ButtonsIndex[client], AC_MAX_BUTTON_SAMPLES);
-	gI_Buttons[client][gI_ButtonsIndex[client]] = buttons;
-	gI_ButtonCount[client]++;
+	gI_ButtonsIndexV2[client] = NextIndex(gI_ButtonsIndexV2[client], AC_MAX_BUTTON_SAMPLES);
+	gI_ButtonsV2[client][gI_ButtonsIndexV2[client]] = buttons;
+	gI_ButtonCountV2[client]++;
 }
 
 // Counts the number of times buttons went from !IN_JUMP to IN_JUMP
 static int CountJumpInputsV2(int client, int sampleSize = AC_MAX_BUTTON_SAMPLES)
 {
 	int[] recentButtons = new int[sampleSize];
-	SortByRecent(gI_Buttons[client], AC_MAX_BUTTON_SAMPLES, recentButtons, sampleSize, gI_ButtonsIndex[client]);
-	int maxIndex = IntMin(gI_ButtonCount[client], sampleSize);
+	SortByRecent(gI_ButtonsV2[client], AC_MAX_BUTTON_SAMPLES, recentButtons, sampleSize, gI_ButtonsIndexV2[client]);
+	int maxIndex = IntMin(gI_ButtonCountV2[client], sampleSize);
 	int jumps = 0;
 	
 	for (int i = 0; i < maxIndex - 1; i++)
@@ -390,9 +443,12 @@ static int CountJumpInputsV2(int client, int sampleSize = AC_MAX_BUTTON_SAMPLES)
 // Reset the tracked bhop stats of the client (V2)
 static void ResetBhopStatsV2(int client)
 {
+    gI_ButtonCountV2[client] = 0;
+    gI_ButtonsIndexV2[client] = 0;
 	gI_BhopCountV2[client] = 0;
 	gI_BhopIndexV2[client] = 0;
 	gI_BhopPendingIndexV2[client] = 0;
+	gI_BhopLastTakeoffCmdnumV2[client] = 0;
 	gI_BhopLastRecordedBhopCmdnumV2[client] = 0;
 	gB_BhopPostJumpInputsPendingV2[client] = false;
 	gB_BindExceptionPendingV2[client] = false;
