@@ -160,7 +160,7 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 	// Cooldown check: require minimum ticks between bhops to prevent spam from head bonks
 	// Allow 8 ticks minimum between jumps (should accommodate both 64 and 128 tick)
 	int ticksSinceLastJump = cmdnum - gI_BhopLastRecordedBhopCmdnumV2[client];
-	bool onCooldown = (gI_BhopLastRecordedBhopCmdnumV2[client] > 0 && ticksSinceLastJump < 8);
+	bool onCooldown = (gI_BhopLastRecordedBhopCmdnumV2[client] > 0 && ticksSinceLastJump < AC_MAX_BUTTON_SAMPLES_V2);
 	
 	// Track if we recorded a jump this tick (for bind exception prevention)
 	bool recordedJump = false;
@@ -199,7 +199,7 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 	// Also skip if this is a jumpbug tick (jumpbugs are handled by the forward)
 	// Also skip if we're still waiting for post-inputs from a previous jump (to prevent double-recording)
 	if (gB_BindExceptionPendingV2[client] && cmdnum > Movement_GetLandingCmdNum(client) + AC_MAX_BHOP_GROUND_TICKS
-		&& !recordedJump && !gB_JumpbugThisTick[client] && !gB_BhopPostJumpInputsPendingV2[client])
+    	&& !recordedJump && cmdnum != gI_LastJumpbugCmdNum[client] && !gB_BhopPostJumpInputsPendingV2[client])
 	{
 		int nextIndex = NextIndex(gI_BhopIndexV2[client], AC_MAX_BHOP_SAMPLES);
 		// Validate index is within bounds before storing and using
@@ -304,7 +304,6 @@ static void RecordJumpV2(int client, int nextIndex, int cmdnum)
 
 static void CheckForBhopMacroV2(int client)
 {
-	// Use V2 getters for detection
 	if (GOKZ_AC_GetPerfCountV2(client, 19) == 19)
 	{
 		SuspectPlayerV2(client, ACReason_BhopHack, "High perf ratio", GenerateBhopBanStatsV2(client, 19));
@@ -389,9 +388,12 @@ static bool JustLandedV2(int client, int cmdnum)
 // Records current button inputs
 void RecordButtonsV2(int client, int buttons)
 {
-	gI_ButtonsIndexV2[client] = NextIndex(gI_ButtonsIndexV2[client], AC_MAX_BUTTON_SAMPLES);
-	gI_ButtonsV2[client][gI_ButtonsIndexV2[client]] = buttons;
-	gI_ButtonCountV2[client]++;
+    gI_ButtonsIndexV2[client] = NextIndex(gI_ButtonsIndexV2[client], AC_MAX_BUTTON_SAMPLES);
+    if (gI_ButtonsIndexV2[client] >= 0 && gI_ButtonsIndexV2[client] < AC_MAX_BUTTON_SAMPLES)
+    {
+        gI_ButtonsV2[client][gI_ButtonsIndexV2[client]] = buttons;
+        gI_ButtonCountV2[client]++;
+    }
 }
 
 // Counts the number of times buttons went from !IN_JUMP to IN_JUMP
@@ -426,6 +428,7 @@ static void ResetBhopStatsV2(int client)
 	gB_BhopPostJumpInputsPendingV2[client] = false;
 	gB_BindExceptionPendingV2[client] = false;
 	gB_BindExceptionPostPendingV2[client] = false;
+    gI_LastJumpbugCmdNum[client] = 0;
 }
 
 // V2-specific suspect function that uses local/SBPP bans only

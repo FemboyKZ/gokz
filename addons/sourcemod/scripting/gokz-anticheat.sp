@@ -76,7 +76,7 @@ ConVar gCV_gokz_autoban_duration_bhop_hack;
 ConVar gCV_gokz_autoban_duration_bhop_macro;
 ConVar gCV_sv_autobunnyhopping;
 
-bool gB_JumpbugThisTick[MAXPLAYERS + 1];
+int gI_LastJumpbugCmdNum[MAXPLAYERS + 1];
 
 #include "gokz-anticheat/api.sp"
 #include "gokz-anticheat/bhop_tracking.sp"
@@ -174,10 +174,9 @@ public void GOKZ_OnJumpValidated(int client, bool jumped, bool ladderJump, bool 
 {
 	if (jumpbug)
 	{
-		// Set the flag for V2 tracking
-		gB_JumpbugThisTick[client] = true;
 		// Only V2 tracks jumpbugs directly
-		OnJumpValidated_RecordJumpbugV2(client, gI_CmdNum[client]);
+        gI_LastJumpbugCmdNum[client] = gI_CmdNum[client];
+        OnJumpValidated_RecordJumpbugV2(client, gI_CmdNum[client]);
 	}
 }
 
