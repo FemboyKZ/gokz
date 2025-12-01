@@ -28,6 +28,7 @@ enum ACReason:
 #define AC_MAX_BUTTON_SAMPLES_V2 8
 #define AC_MAX_BHOP_GROUND_TICKS 8
 #define AC_MAX_BHOP_SAMPLES 30
+#define AC_MAX_BHOP_SAMPLES_V2 50
 #define AC_BINDEXCEPTION_SAMPLES 5
 #define AC_LOG_PATH "logs/gokz-anticheat.log"
 

@@ -9,33 +9,33 @@
 void PrintBhopCheckToChat_V2(int client, int target)
 {
 	GOKZ_PrintToChat(client, true, 
-		"{orchid}[FKZ AC] {lime}%N {grey}[{lime}%d%%%% {grey}%t | {lime}%.2f {grey}%t]", 
+		"{lime}%N {grey}[{lime}%d%%%% {grey}%t | {lime}%.2f {grey}%t]", 
 		target, 
-		RoundFloat(GOKZ_AC_GetPerfCountV2(target, 20) * 100.0 / IntMin(gI_BhopCountV2[target], 20)), 
+		RoundFloat(GOKZ_AC_GetPerfCountV2(target, 30) * 100.0 / IntMin(gI_BhopCountV2[target], 30)), 
 		"Perfs", 
-		GOKZ_AC_GetAverageJumpInputsV2(target, 20), 
+		GOKZ_AC_GetAverageJumpInputsV2(target, 30), 
 		"Average");
 	GOKZ_PrintToChat(client, false, 
 		" {grey}%t - %s", 
 		"Pattern", 
-		GenerateScrollPatternV2(target, 20));
+		GenerateScrollPatternV2(target, 30));
 }
 
 void PrintBhopCheckToConsole_V2(int client, int target)
 {
 	PrintToConsole(client, 
-		"[FKZ AC] %N [%d%% %t | %.2f %t]\n %t - %s", 
+		"%N [%d%% %t | %.2f %t]\n %t - %s", 
 		target, 
-		RoundFloat(GOKZ_AC_GetPerfCountV2(target, 20) * 100.0 / IntMin(gI_BhopCountV2[target], 20)), 
+		RoundFloat(GOKZ_AC_GetPerfCountV2(target, 30) * 100.0 / IntMin(gI_BhopCountV2[target], 30)), 
 		"Perfs", 
-		GOKZ_AC_GetAverageJumpInputsV2(target, 20), 
+		GOKZ_AC_GetAverageJumpInputsV2(target, 30), 
 		"Average", 
 		"Pattern", 
-		GenerateScrollPatternV2(target, 20, false));
+		GenerateScrollPatternV2(target, 30, false));
 }
 
 // Generate 'scroll pattern' for V2
-char[] GenerateScrollPatternV2(int client, int sampleSize = AC_MAX_BHOP_SAMPLES, bool colours = true)
+char[] GenerateScrollPatternV2(int client, int sampleSize = AC_MAX_BHOP_SAMPLES_V2, bool colours = true)
 {
 	char report[512];
 	int maxIndex = IntMin(gI_BhopCountV2[client], sampleSize);
@@ -68,7 +68,7 @@ char[] GenerateScrollPatternV2(int client, int sampleSize = AC_MAX_BHOP_SAMPLES,
 }
 
 // Generate 'scroll pattern' report showing pre and post inputs instead
-char[] GenerateScrollPatternExV2(int client, int sampleSize = AC_MAX_BHOP_SAMPLES)
+char[] GenerateScrollPatternExV2(int client, int sampleSize = AC_MAX_BHOP_SAMPLES_V2)
 {
 	char report[512];
 	int maxIndex = IntMin(gI_BhopCountV2[client], sampleSize);
@@ -119,7 +119,7 @@ void OnJumpValidated_RecordJumpbugV2(int client, int cmdnum)
 		// Use the stored pending index to avoid recalculation
 		// The pre/post jump inputs are already correct from the bhop recording
 		int pendingIdx = gI_BhopPendingIndexV2[client];
-		if (pendingIdx >= 0 && pendingIdx < AC_MAX_BHOP_SAMPLES)
+		if (pendingIdx >= 0 && pendingIdx < AC_MAX_BHOP_SAMPLES_V2)
 		{
 			gB_BhopHitPerfV2[client][pendingIdx] = Movement_GetHitPerf(client);
 		}
@@ -129,9 +129,9 @@ void OnJumpValidated_RecordJumpbugV2(int client, int cmdnum)
 	else
 	{
 		// New jumpbug (not preceded by a bhop recording), record it normally
-		int nextIndex = NextIndex(gI_BhopIndexV2[client], AC_MAX_BHOP_SAMPLES);
+		int nextIndex = NextIndex(gI_BhopIndexV2[client], AC_MAX_BHOP_SAMPLES_V2);
 		// Validate index is within bounds before storing
-		if (nextIndex >= 0 && nextIndex < AC_MAX_BHOP_SAMPLES)
+		if (nextIndex >= 0 && nextIndex < AC_MAX_BHOP_SAMPLES_V2)
 		{
 			gI_BhopPendingIndexV2[client] = nextIndex;
 			RecordJumpV2(client, nextIndex, cmdnum);
@@ -172,7 +172,7 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 		if (gB_BhopPostJumpInputsPendingV2[client])
 		{
 			int pendingIdx = gI_BhopPendingIndexV2[client];
-			if (pendingIdx >= 0 && pendingIdx < AC_MAX_BHOP_SAMPLES)
+			if (pendingIdx >= 0 && pendingIdx < AC_MAX_BHOP_SAMPLES_V2)
 			{
 				// Finalize with whatever inputs we have
 				gI_BhopPostJumpInputsV2[client][pendingIdx] = CountJumpInputsV2(client);
@@ -183,9 +183,9 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 			gB_BhopPostJumpInputsPendingV2[client] = false;
 		}
 		// Now record the new bhop
-		int nextIndex = NextIndex(gI_BhopIndexV2[client], AC_MAX_BHOP_SAMPLES);
+		int nextIndex = NextIndex(gI_BhopIndexV2[client], AC_MAX_BHOP_SAMPLES_V2);
 		// Validate index is within bounds before storing
-		if (nextIndex >= 0 && nextIndex < AC_MAX_BHOP_SAMPLES)
+		if (nextIndex >= 0 && nextIndex < AC_MAX_BHOP_SAMPLES_V2)
 		{
 			gI_BhopPendingIndexV2[client] = nextIndex;
 			RecordJumpV2(client, nextIndex, cmdnum);
@@ -201,9 +201,9 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 	if (gB_BindExceptionPendingV2[client] && cmdnum > Movement_GetLandingCmdNum(client) + AC_MAX_BHOP_GROUND_TICKS
     	&& !recordedJump && cmdnum != gI_LastJumpbugCmdNum[client] && !gB_BhopPostJumpInputsPendingV2[client])
 	{
-		int nextIndex = NextIndex(gI_BhopIndexV2[client], AC_MAX_BHOP_SAMPLES);
+		int nextIndex = NextIndex(gI_BhopIndexV2[client], AC_MAX_BHOP_SAMPLES_V2);
 		// Validate index is within bounds before storing and using
-		if (nextIndex >= 0 && nextIndex < AC_MAX_BHOP_SAMPLES)
+		if (nextIndex >= 0 && nextIndex < AC_MAX_BHOP_SAMPLES_V2)
 		{
 			gI_BhopPendingIndexV2[client] = nextIndex;
 			gB_BhopHitPerfV2[client][nextIndex] = false;
@@ -220,7 +220,7 @@ void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 	{
 		// Use the stored pending index to finalize the recording
 		int pendingIdx = gI_BhopPendingIndexV2[client];
-		if (pendingIdx >= 0 && pendingIdx < AC_MAX_BHOP_SAMPLES)
+		if (pendingIdx >= 0 && pendingIdx < AC_MAX_BHOP_SAMPLES_V2)
 		{
 			gI_BhopPostJumpInputsV2[client][pendingIdx] = CountJumpInputsV2(client);
 			gI_BhopIndexV2[client] = pendingIdx;
@@ -304,26 +304,9 @@ static void RecordJumpV2(int client, int nextIndex, int cmdnum)
 
 static void CheckForBhopMacroV2(int client)
 {
-	if (GOKZ_AC_GetPerfCountV2(client, 19) == 19)
+	if (GOKZ_AC_GetPerfCountV2(client, 30) >= 16 && GOKZ_AC_GetAverageJumpInputsV2(client, 30) <= 2.0 + EPSILON)
 	{
-		SuspectPlayerV2(client, ACReason_BhopHack, "High perf ratio", GenerateBhopBanStatsV2(client, 19));
-	}
-	else if (GOKZ_AC_GetPerfCountV2(client, 30) >= 28)
-	{
-		SuspectPlayerV2(client, ACReason_BhopHack, "High perf ratio", GenerateBhopBanStatsV2(client, 30));
-	}
-	else if (GOKZ_AC_GetPerfCountV2(client, 20) >= 16 && GOKZ_AC_GetAverageJumpInputsV2(client, 20) <= 2.0 + EPSILON)
-	{
-		SuspectPlayerV2(client, ACReason_BhopHack, "1's or 2's scroll pattern", GenerateBhopBanStatsV2(client, 20));
-	}
-	else if (gI_BhopCountV2[client] >= 20 && GOKZ_AC_GetPerfCountV2(client, 20) >= 8
-		 && GOKZ_AC_GetAverageJumpInputsV2(client, 20) >= 19.0 - EPSILON)
-	{
-		SuspectPlayerV2(client, ACReason_BhopMacro, "High scroll pattern", GenerateBhopBanStatsV2(client, 20));
-	}
-	else if (GOKZ_AC_GetPerfCountV2(client, 30) >= 10 && CheckForRepeatingJumpInputsCountV2(client, 25, 30) >= 14)
-	{
-		SuspectPlayerV2(client, ACReason_BhopMacro, "Repeating scroll pattern", GenerateBhopBanStatsV2(client, 30));
+		SuspectPlayerV2(client, ACReason_BhopHack, "1's or 2's scroll pattern", GenerateBhopBanStatsV2(client, 30));
 	}
 }
 
@@ -331,7 +314,7 @@ static char[] GenerateBhopBanStatsV2(int client, int sampleSize)
 {
 	char stats[512];
 	FormatEx(stats, sizeof(stats), 
-		"[FKZ AC] Perfs: %d/%d, Average: %.2f, Scroll pattern: %s", 
+		"Perfs: %d/%d, Average: %.2f, Scroll pattern: %s", 
 		GOKZ_AC_GetPerfCountV2(client, sampleSize), 
 		IntMin(gI_BhopCountV2[client], sampleSize), 
 		GOKZ_AC_GetAverageJumpInputsV2(client, sampleSize), 
@@ -339,7 +322,7 @@ static char[] GenerateBhopBanStatsV2(int client, int sampleSize)
 	return stats;
 }
 
-static int CheckForRepeatingJumpInputsCountV2(int client, int threshold, int sampleSize = AC_MAX_BHOP_SAMPLES)
+static int CheckForRepeatingJumpInputsCountV2(int client, int threshold, int sampleSize = AC_MAX_BHOP_SAMPLES_V2)
 {
 	int maxIndex = IntMin(gI_BhopCountV2[client], sampleSize);
 	int[] jumpInputs = new int[maxIndex];
@@ -435,14 +418,14 @@ static void ResetBhopStatsV2(int client)
 static void SuspectPlayerV2(int client, ACReason reason, const char[] reasonDetails, const char[] reasonStats)
 {
 	// Log to console/admin with [V2] prefix
-	LogMessage("[FKZ AC] %N suspected: %s - %s", client, reasonDetails, reasonStats);
+	LogMessage("%N suspected: %s - %s", client, reasonDetails, reasonStats);
 	
 	// Notify admins
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (IsClientInGame(i) && CheckCommandAccess(i, "sm_ban", ADMFLAG_BAN))
 		{
-			GOKZ_PrintToChat(i, true, "{grey}[{red}FKZ AC{grey}] {default}%N {grey}- %s", client, reasonDetails);
+			GOKZ_PrintToChat(i, true, "{default}%N {grey}- %s", client, reasonDetails);
 		}
 	}
 	
@@ -456,8 +439,8 @@ static void SuspectPlayerV2(int client, ACReason reason, const char[] reasonDeta
 		char kickMessage[256];
 		int duration = (reason == ACReason_BhopHack) ? gCV_gokz_autoban_duration_bhop_hack.IntValue : gCV_gokz_autoban_duration_bhop_macro.IntValue;
 		
-		FormatEx(banReason, sizeof(banReason), "[FKZ] gokz-anticheat - %s", reasonDetails);
-		FormatEx(kickMessage, sizeof(kickMessage), "You have been banned by FKZ AC detection.\nContact the server administrator for more info.\n%s", reasonStats);
+		FormatEx(banReason, sizeof(banReason), "gokz-anticheat (v2) - %s", reasonDetails);
+		FormatEx(kickMessage, sizeof(kickMessage), "You have been banned by GOKZ Anticheat detection.\nContact the server administrator for more info.\n%s", reasonStats);
 		
 		// Use standard ban methods (local/SBPP only, no Global API)
 		if (gB_SourceBansPP)

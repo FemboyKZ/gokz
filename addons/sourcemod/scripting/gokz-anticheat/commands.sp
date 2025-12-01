@@ -1,7 +1,7 @@
 void RegisterCommands()
 {
 	RegAdminCmd("sm_bhopcheck", CommandBhopCheck, ADMFLAG_ROOT, "[KZ] Show bunnyhop stats report including perf ratio and scroll pattern.");
-	RegAdminCmd("sm_bhopcheck_fkz", CommandBhopCheckV2, ADMFLAG_ROOT, "[FKZ] Show V2 bunnyhop stats report (jumpbug-aware detection).");
+	RegAdminCmd("sm_bhopcheck_v2", CommandBhopCheckV2, ADMFLAG_ROOT, "[FKZ] Show V2 bunnyhop stats report (jumpbug-aware detection).");
 }
 
 public Action CommandBhopCheck(int client, int args)
@@ -82,7 +82,7 @@ public Action CommandBhopCheckV2(int client, int args)
 	{
 		if (GOKZ_AC_GetSampleSizeV2(client) == 0)
 		{
-			GOKZ_PrintToChat(client, true, "{orchid}[FKZ AC] {default}%t", "Not Enough Bhops (Self)");
+			GOKZ_PrintToChat(client, true, "{default}%t", "Not Enough Bhops (Self)");
 		}
 		else
 		{
@@ -118,7 +118,7 @@ public Action CommandBhopCheckV2(int client, int args)
 		{
 			if (GOKZ_AC_GetSampleSizeV2(targetList[i]) == 0)
 			{
-				PrintToConsole(client, "[FKZ AC] %t", "Not Enough Bhops (Console)", targetList[i]);
+				PrintToConsole(client, "%t", "Not Enough Bhops (Console)", targetList[i]);
 			}
 			else
 			{
@@ -132,11 +132,11 @@ public Action CommandBhopCheckV2(int client, int args)
 		{
 			if (targetList[0] == client)
 			{
-				GOKZ_PrintToChat(client, true, "{orchid}[FKZ AC] {default}%t", "Not Enough Bhops (Self)");
+				GOKZ_PrintToChat(client, true, "{default}%t", "Not Enough Bhops (Self)");
 			}
 			else
 			{
-				GOKZ_PrintToChat(client, true, "{orchid}[FKZ AC] {default}%t", "Not Enough Bhops", targetList[0]);
+				GOKZ_PrintToChat(client, true, "{default}%t", "Not Enough Bhops", targetList[0]);
 			}
 		}
 		else

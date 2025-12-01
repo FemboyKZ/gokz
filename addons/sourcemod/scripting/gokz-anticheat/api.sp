@@ -205,7 +205,7 @@ static void SortByRecentBool(const bool[] input, int inputSize, bool[] buffer, i
 
 int GOKZ_AC_GetSampleSizeV2(int client)
 {
-	return IntMin(gI_BhopCountV2[client], AC_MAX_BHOP_SAMPLES);
+	return IntMin(gI_BhopCountV2[client], AC_MAX_BHOP_SAMPLES_V2);
 }
 
 int GOKZ_AC_GetHitPerfV2(int client, bool[] perfs, int sampleSize)
@@ -215,7 +215,7 @@ int GOKZ_AC_GetHitPerfV2(int client, bool[] perfs, int sampleSize)
 	{
 		return 0;
 	}
-	SortByRecentBool(gB_BhopHitPerfV2[client], AC_MAX_BHOP_SAMPLES, perfs, sampleSize, gI_BhopIndexV2[client]);
+	SortByRecentBool(gB_BhopHitPerfV2[client], AC_MAX_BHOP_SAMPLES_V2, perfs, sampleSize, gI_BhopIndexV2[client]);
 	return sampleSize;
 }
 
@@ -250,9 +250,9 @@ int GOKZ_AC_GetJumpInputsV2(int client, int[] jumpInputs, int sampleSize)
 	}
 
 	int[] preJumpInputs = new int[sampleSize];
-	SortByRecent(gI_BhopPreJumpInputsV2[client], AC_MAX_BHOP_SAMPLES, preJumpInputs, sampleSize, gI_BhopIndexV2[client]);
+	SortByRecent(gI_BhopPreJumpInputsV2[client], AC_MAX_BHOP_SAMPLES_V2, preJumpInputs, sampleSize, gI_BhopIndexV2[client]);
 	int[] postJumpInputs = new int[sampleSize];
-	SortByRecent(gI_BhopPostJumpInputsV2[client], AC_MAX_BHOP_SAMPLES, postJumpInputs, sampleSize, gI_BhopIndexV2[client]);
+	SortByRecent(gI_BhopPostJumpInputsV2[client], AC_MAX_BHOP_SAMPLES_V2, postJumpInputs, sampleSize, gI_BhopIndexV2[client]);
 
 	for (int i = 0; i < sampleSize; i++)
 	{
@@ -287,7 +287,7 @@ int GOKZ_AC_GetPreJumpInputsV2(int client, int[] preJumpInputs, int sampleSize)
 	{
 		return 0;
 	}
-	SortByRecent(gI_BhopPreJumpInputsV2[client], AC_MAX_BHOP_SAMPLES, preJumpInputs, sampleSize, gI_BhopIndexV2[client]);
+	SortByRecent(gI_BhopPreJumpInputsV2[client], AC_MAX_BHOP_SAMPLES_V2, preJumpInputs, sampleSize, gI_BhopIndexV2[client]);
 	return sampleSize;
 }
 
@@ -298,6 +298,6 @@ int GOKZ_AC_GetPostJumpInputsV2(int client, int[] postJumpInputs, int sampleSize
 	{
 		return 0;
 	}
-	SortByRecent(gI_BhopPostJumpInputsV2[client], AC_MAX_BHOP_SAMPLES, postJumpInputs, sampleSize, gI_BhopIndexV2[client]);
+	SortByRecent(gI_BhopPostJumpInputsV2[client], AC_MAX_BHOP_SAMPLES_V2, postJumpInputs, sampleSize, gI_BhopIndexV2[client]);
 	return sampleSize;
 }
