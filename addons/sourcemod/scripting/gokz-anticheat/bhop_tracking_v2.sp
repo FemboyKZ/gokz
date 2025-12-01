@@ -308,6 +308,10 @@ static void CheckForBhopMacroV2(int client)
 	{
 		SuspectPlayerV2(client, ACReason_BhopHack, "1's or 2's scroll pattern", GenerateBhopBanStatsV2(client, 30));
 	}
+	else if (GOKZ_AC_GetPerfCountV2(client, 40) >= 15 && CheckForRepeatingJumpInputsCountV2(client, 25, 40) >= 24)
+	{
+		SuspectPlayerV2(client, ACReason_BhopMacro, "Repeating scroll pattern", GenerateBhopBanStatsV2(client, 40));
+	}
 }
 
 static char[] GenerateBhopBanStatsV2(int client, int sampleSize)
