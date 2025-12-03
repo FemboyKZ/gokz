@@ -439,11 +439,12 @@ static void SuspectPlayerV2(int client, ACReason reason, const char[] reasonDeta
 	// Apply local/SBPP ban (NOT Global API)
 	if (gCV_gokz_autoban.BoolValue)
 	{
-		char banReason[256];
+		char banReason[512];
 		char kickMessage[256];
 		int duration = (reason == ACReason_BhopHack) ? gCV_gokz_autoban_duration_bhop_hack.IntValue : gCV_gokz_autoban_duration_bhop_macro.IntValue;
 		
-		FormatEx(banReason, sizeof(banReason), "gokz-anticheat (v2) - %s", reasonDetails);
+		// Include scroll pattern in ban reason for SBPP/SourceBans
+		FormatEx(banReason, sizeof(banReason), "gokz-anticheat (v2) - %s | %s", reasonDetails, reasonStats);
 		FormatEx(kickMessage, sizeof(kickMessage), "You have been banned by GOKZ Anticheat detection.\nContact the server administrator for more info.\n%s", reasonStats);
 		
 		// Use standard ban methods (local/SBPP only, no Global API)
