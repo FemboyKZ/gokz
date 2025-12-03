@@ -304,7 +304,7 @@ static void RecordJumpV2(int client, int nextIndex, int cmdnum)
 
 static void CheckForBhopMacroV2(int client)
 {
-	if (GOKZ_AC_GetPerfCountV2(client, 30) >= 16 && GOKZ_AC_GetAverageJumpInputsV2(client, 30) <= 2.0 + EPSILON)
+	if (GOKZ_AC_GetPerfCountV2(client, 30) >= 25 && GOKZ_AC_GetAverageJumpInputsV2(client, 30) <= 2.0 + EPSILON)
 	{
 		SuspectPlayerV2(client, ACReason_BhopHack, "0's, 1's or 2's scroll pattern", GenerateBhopBanStatsV2(client, 30));
 	}
