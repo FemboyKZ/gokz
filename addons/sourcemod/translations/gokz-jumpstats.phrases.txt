@@ -133,10 +133,6 @@
 		"en"		"Miss"
 		"ru"		"Miss"
 	}
-	"Estimated Crouch Distance"
-	{
-		"en"		"ECD"
-	}
 
 	// =====[ CHAT MESSAGES ]=====
 	"Dropped Too Far (Weird Jump)"
