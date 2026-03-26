@@ -9,6 +9,12 @@
 	}
 
 
+	"Pistol - Midair"
+	{
+		"en"		"{darkred}You can't change your pistol while midair."
+	}
+
+
 	// =====[ OPTIONS MENU ]=====
 	"Options Menu - Pistol"
 	{

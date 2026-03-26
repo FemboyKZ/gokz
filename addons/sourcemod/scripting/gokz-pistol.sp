@@ -14,7 +14,7 @@
 public Plugin myinfo = 
 {
 	name = "GOKZ Pistol", 
-	author = "DanZay", 
+	author = "DanZay, (FKZ mod)", 
 	description = "Allows players to pick a pistol to KZ with", 
 	version = GOKZ_VERSION, 
 	url = GOKZ_SOURCE_URL
@@ -107,6 +107,13 @@ void GivePistol(int client, int pistol)
 	if (!IsClientInGame(client) || !IsPlayerAlive(client)
 		 || GetClientTeam(client) == CS_TEAM_NONE)
 	{
+		return;
+	}
+
+	// Don't allow pistol changes midair to prevent team-switch movement glitches
+	if (!Movement_GetOnGround(client))
+	{
+		GOKZ_PrintToChat(client, true, "%t", "Pistol - Midair");
 		return;
 	}
 
