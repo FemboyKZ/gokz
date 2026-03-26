@@ -30,6 +30,7 @@ static int lastGroundSpeedCappedTime[MAXPLAYERS + 1];
 static int lastMovementProcessedTime[MAXPLAYERS + 1];
 static float lastJumpButtonTime[MAXPLAYERS + 1];
 static bool validCmd[MAXPLAYERS + 1]; // Whether no illegal action is detected
+static bool hitHeadDuringJump[MAXPLAYERS + 1];
 static const float playerMins[3] =  { -16.0, -16.0, 0.0 };
 static const float playerMaxs[3] =  { 16.0, 16.0, 0.0 };
 static const float playerMinsEx[3] = { -20.0, -20.0, 0.0 };
@@ -73,6 +74,7 @@ enum struct JumpTracker
 	bool failstatBlockDetected;
 	bool failstatFailed;
 	bool failstatValid;
+	bool hitHead;
 	float failstatBlockHeight;
 	float takeoffOrigin[3];
 	float takeoffVelocity[3];
@@ -84,6 +86,7 @@ enum struct JumpTracker
 		this.jump.jumper = jumper;
 		this.nextCrouchRelease = 100;
 		this.tickCount = 0;
+		this.hitHead = false;
 	}
 	
 	
@@ -92,6 +95,11 @@ enum struct JumpTracker
 	
 	void Reset(bool jumped, bool ladderJump, bool jumpbug)
 	{
+		// Store the head hit status from the previous jump for bhop validation
+		// This must be done BEFORE DetermineType() since it checks HitHeadRecently()
+		hitHeadDuringJump[this.jumper] = this.hitHead;
+		this.hitHead = false;
+
 		// We need to do that before we reset the jump cause we need the
 		// offset and type of the previous jump
 		this.lastType = this.DetermineType(jumped, ladderJump, jumpbug);
@@ -326,7 +334,7 @@ enum struct JumpTracker
 				return JumpType_Invalid;
 			}
 		}
-		else if (this.HitBhop() && !this.HitDuckbugRecently())
+		else if (this.HitBhop() && !this.HitDuckbugRecently() && !this.HitHeadRecently())
 		{
 			// Check for no offset
 			if (FloatAbs(this.jump.offset) < JS_OFFSET_EPSILON)
@@ -380,6 +388,11 @@ enum struct JumpTracker
 	bool HitDuckbugRecently()
 	{
 		return this.tickCount - lastDuckbugTime[this.jumper] <= JS_MAX_DUCKBUG_RESET_TICKS;
+	}
+	
+	bool HitHeadRecently()
+	{
+		return hitHeadDuringJump[this.jumper];
 	}
 	
 	bool GroundSpeedCappedRecently()
@@ -1319,6 +1332,7 @@ void OnClientPutInServer_JumpTracking(int client)
 	lastNoclipTime[client] = 0;
 	lastDuckbugTime[client] = 0;
 	lastJumpButtonTime[client] = 0.0;
+	hitHeadDuringJump[client] = false;
 	jumpTrackers[client].Init(client);
 	DHookEntity(acceptInputHook, true, client);
 }
@@ -1358,9 +1372,20 @@ void OnStartTouch_JumpTracking(int client, int touched)
 {
 	if (entityTouchList[client] != INVALID_HANDLE)
 	{
-		entityTouchList[client].Push(touched);
-		// Do not immediately invalidate jumps upon collision.
-		// Give the player a few ticks of leniency for late ducking.
+		// Only track solid entities, not triggers
+		// SOLID_NONE = 0, SOLID_BSP = 1, SOLID_BBOX = 2, etc.
+		// Triggers typically have SOLID_NONE or use FSOLID_TRIGGER flag
+		int solidType = GetEntProp(touched, Prop_Send, "m_nSolidType");
+		int solidFlags = GetEntProp(touched, Prop_Send, "m_usSolidFlags");
+		
+		// FSOLID_TRIGGER = 0x0008 - skip trigger entities
+		// SOLID_NONE = 0 - skip non-solid entities
+		if (solidType != 0 && !(solidFlags & 0x0008))
+		{
+			entityTouchList[client].Push(touched);
+			// Do not immediately invalidate jumps upon collision.
+			// Give the player a few ticks of leniency for late ducking.
+		}
 	}
 }
 
@@ -1369,6 +1394,13 @@ void OnTouch_JumpTracking(int client)
 	if (entityTouchList[client] != INVALID_HANDLE && entityTouchList[client].Length > 0)
 	{
 		entityTouchDuration[client]++;
+		
+		float velocity[3];
+		Movement_GetVelocity(client, velocity);
+		if (velocity[2] > 0.0)
+		{
+			jumpTrackers[client].hitHead = true;
+		}
 	}
 	if (!Movement_GetOnGround(client) && entityTouchDuration[client] > JS_TOUCH_GRACE_TICKS)
 	{
