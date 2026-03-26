@@ -334,8 +334,13 @@ enum struct JumpTracker
 				return JumpType_Invalid;
 			}
 		}
-		else if (this.HitBhop() && !this.HitDuckbugRecently() && !this.HitHeadRecently())
+		else if (this.HitBhop() && !this.HitDuckbugRecently())
 		{
+			// Head hit invalidates following bhops but not the current jump
+			if (this.HitHeadRecently())
+			{
+				return JumpType_Invalid;
+			}
 			// Check for no offset
 			if (FloatAbs(this.jump.offset) < JS_OFFSET_EPSILON)
 			{
