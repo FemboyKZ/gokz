@@ -1,6 +1,42 @@
 # GOKZ SourceMod Plugins (CS:GO)
 
+This is a modified fork for FKZ Servers.
+
 GOKZ is a package of [SourceMod](https://www.sourcemod.net/about.php) plugins for CS:GO Kreedz (KZ) servers. The KZ game mode involves [speedrunning](https://en.wikipedia.org/wiki/Speedrun) through custom maps.
+
+## FKZ Changes
+
+* Syncable replays v2 from [HoC fork (syncable-replays-v2)](https://github.com/hoc-kz/gokz/).
+* Separated USP-S and P2000 from [AXE fork (pistol-menu-split)](https://github.com/cinyan10/gokz).
+* Fix changing pistol midair to disable switchteam bug (This could be fixed better).
+* Fix headhitter jumpstats registering (ported from cs2kz).
+* Make gokz-global module optional for gokz-profile functionality.
+* Added FKZ Specific VIP Role tags to gokz-profile.
+* Experimental anti-cheat for auto-jumpbug.
+* Optional detailed output for gokz-measure commands.
+
+### Modified plugins
+
+```txt
+gokz-anticheat
+gokz-jumpstats
+gokz-localdb
+gokz-localranks
+gokz-measure
+gokz-pistol
+gokz-profile
+gokz-replays
+```
+
+### Modified translations
+
+```txt
+gokz-jumpstats
+gokz-localranks
+gokz-measure
+gokz-pistol
+gokz-profile
+```
 
 ## Features
 
