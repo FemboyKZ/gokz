@@ -61,7 +61,15 @@ bool MeasureDistance(int client, float minDistToMeasureBlock = -1.0)
 		}
 		else
 		{
-			GOKZ_PrintToChat(client, true, "%t", "Measure Result", horizontalDist, effectiveDist, verticalDist);
+			if (gB_MeasureDetailed[client])
+			{
+				GOKZ_PrintToChat(client, true, "%t", "Measure Result Detailed", horizontalDist, effectiveDist, verticalDist);
+				GOKZ_PrintToChat(client, true, "%t", "Measure Result Exact Z", gF_MeasurePos[client][0][2], gF_MeasurePos[client][1][2], verticalDist);
+			}
+			else 
+			{
+				GOKZ_PrintToChat(client, true, "%t", "Measure Result", horizontalDist, effectiveDist, verticalDist);
+			}
 			MeasureBeam(client, gF_MeasurePos[client][0], gF_MeasurePos[client][1], 5.0, 0.2, 200, 200, 200);
 		}
 		return true;
@@ -165,6 +173,10 @@ static void MeasureGetPosEx(int client, int arg, float origin[3], float angles[3
 		gB_MeasurePosSet[client][0] = true;
 		gH_P2PRed[client] = CreateTimer(1.0, Timer_P2PRed, GetClientUserId(client), TIMER_REPEAT);
 		P2PXBeam(client, 0);
+		if (gB_MeasureDetailed[client])
+		{
+			GOKZ_PrintToChat(client, true, "%t", "Measure Exact Set Point", "A", gF_MeasurePos[client][0][0], gF_MeasurePos[client][0][1], gF_MeasurePos[client][0][2]);
+		}
 	}
 	else
 	{
@@ -173,6 +185,10 @@ static void MeasureGetPosEx(int client, int arg, float origin[3], float angles[3
 		gB_MeasurePosSet[client][1] = true;
 		P2PXBeam(client, 1);
 		gH_P2PGreen[client] = CreateTimer(1.0, Timer_P2PGreen, GetClientUserId(client), TIMER_REPEAT);
+		if (gB_MeasureDetailed[client])
+		{
+			GOKZ_PrintToChat(client, true, "%t", "Measure Exact Set Point", "B", gF_MeasurePos[client][1][0], gF_MeasurePos[client][1][1], gF_MeasurePos[client][1][2]);
+		}
 	}
 }
 

@@ -9,6 +9,25 @@
 		"chi"		"{default}距离{grey} - 水平位移: {default}{1}{grey} ({default}{2}{grey}), 垂直位移: {default}{3}{grey}"
 		"ru"		"{default}Дистация{grey} - Горизонтальная: {default}{1}{grey} ({default}{2}{grey}), Вертикальная: {default}{3}{grey}"
 	}
+	"Measure Result Detailed"
+	{
+		// Distance - Horizontal: 123.4567 (121.1111), Vertical: 12.34567.
+		"#format"	"{1:.4f},{2:.4f},{3:.5f}"
+		"en"		"{default}Distance{grey} - Horizontal: {default}{1}{grey} ({default}{2}{grey}), Vertical: {default}{3}{grey}"
+		"chi"		"{default}距离{grey} - 水平位移: {default}{1}{grey} ({default}{2}{grey}), 垂直位移: {default}{3}{grey}"
+		"ru"		"{default}Дистация{grey} - Горизонтальная: {default}{1}{grey} ({default}{2}{grey}), Вертикальная: {default}{3}{grey}"
+	}
+	"Measure Result Exact Z"
+	{
+		"#format"	"{1:.4f},{2:.4f},{3:.4f}"
+		"en"		"{default}Z Values{grey} - A: {default}{1}{grey} B: {default}{2}{grey} (Diff: {default}{3}{grey})"
+	}
+	"Measure Exact Set Point"
+	{
+		// Point A set at X=123.4567 Y=234.5678 Z=345.6789
+		"#format"	"{2:.4f},{3:.4f},{4:.4f}"
+		"en"		"{default}Point {1} set at {default}X={2} Y={3} {lime}Z={4}"
+	}
 	"Block Measure Result"
 	{
 		// Block Distance - Horizontal: 262.0
