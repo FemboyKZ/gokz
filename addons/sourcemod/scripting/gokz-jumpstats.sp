@@ -21,7 +21,7 @@
 public Plugin myinfo = 
 {
 	name = "GOKZ Jumpstats", 
-	author = "DanZay", 
+	author = "DanZay, (FKZ mod)", 
 	description = "Tracks and outputs movement statistics", 
 	version = GOKZ_VERSION, 
 	url = GOKZ_SOURCE_URL

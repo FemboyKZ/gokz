@@ -16,13 +16,11 @@
 public Plugin myinfo =
 {
     name        = "GOKZ Profile",
-    author      = "zealain",
+    author      = "zealain, FKZ mod",
     description = "Player profiles and ranks based on local and global data.",
     version     = GOKZ_VERSION,
     url         = GOKZ_SOURCE_URL
 };
-
-#define UPDATER_URL GOKZ_UPDATER_BASE_URL... "gokz-profile.txt"
 
 int  gI_Rank[MAXPLAYERS + 1][MODE_COUNT];
 bool gB_Localranks;
