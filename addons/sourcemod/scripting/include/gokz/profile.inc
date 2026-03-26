@@ -209,7 +209,7 @@ stock char gC_ProfileOptionDescriptions[PROFILEOPTION_COUNT][] =
 {
 	"Show Rank Tag in Chat - 0 = Disabled, 1 = Enabled",
 	"Show Rank in Clan - 0 = Disabled, 1 = Enabled",
-	"Type of Tag to Show - 0 = Rank, 1 = Admin, 2 Mod, 3 = VIP, 4 = VIP+, 5 = Contributor, 6 = Custom (boa), 7 = Custom (Meower), 8 = Custom (cat)"
+	"Type of Tag to Show - 0 = Rank, 1 = Admin, 2 = VIP, 3 = VIP+, 4 = Contributor, 5 = Custom (boa), 6 = Custom (Meower), 7 = Custom (cat)"
 };
 
 stock char gC_ProfileOptionPhrases[PROFILEOPTION_COUNT][] = 
