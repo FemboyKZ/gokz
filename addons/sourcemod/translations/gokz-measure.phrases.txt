@@ -25,7 +25,7 @@
 	"Measure Exact Set Point"
 	{
 		// Point A set at X=123.4567 Y=234.5678 Z=345.6789
-		"#format"	"{2:.4f},{3:.4f},{4:.4f}"
+		"#format"	"{1:s},{2:.4f},{3:.4f},{4:.4f}"
 		"en"		"{default}Point {1} set at {default}X={2} Y={3} {lime}Z={4}"
 	}
 	"Block Measure Result"
