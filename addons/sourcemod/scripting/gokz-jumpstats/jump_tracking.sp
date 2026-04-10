@@ -1377,20 +1377,9 @@ void OnStartTouch_JumpTracking(int client, int touched)
 {
 	if (entityTouchList[client] != INVALID_HANDLE)
 	{
-		// Only track solid entities, not triggers
-		// SOLID_NONE = 0, SOLID_BSP = 1, SOLID_BBOX = 2, etc.
-		// Triggers typically have SOLID_NONE or use FSOLID_TRIGGER flag
-		int solidType = GetEntProp(touched, Prop_Send, "m_nSolidType");
-		int solidFlags = GetEntProp(touched, Prop_Send, "m_usSolidFlags");
-		
-		// FSOLID_TRIGGER = 0x0008 - skip trigger entities
-		// SOLID_NONE = 0 - skip non-solid entities
-		if (solidType != 0 && !(solidFlags & 0x0008))
-		{
-			entityTouchList[client].Push(touched);
-			// Do not immediately invalidate jumps upon collision.
-			// Give the player a few ticks of leniency for late ducking.
-		}
+		entityTouchList[client].Push(touched);
+		// Do not immediately invalidate jumps upon collision.
+		// Give the player a few ticks of leniency for late ducking.
 	}
 }
 
