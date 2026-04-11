@@ -110,13 +110,6 @@ void GivePistol(int client, int pistol)
 		return;
 	}
 
-	// Don't allow pistol changes midair to prevent team-switch movement glitches
-	if (!Movement_GetOnGround(client))
-	{
-		GOKZ_PrintToChat(client, true, "%t", "Pistol - Midair");
-		return;
-	}
-
 	int playerTeam = GetClientTeam(client);
 	bool switchedTeams = false;
 
