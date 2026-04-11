@@ -2,6 +2,7 @@
 #define ITEM_INFO_POINT_B "b"
 #define ITEM_INFO_GET_DISTANCE "get"
 #define ITEM_INFO_GET_BLOCK_DISTANCE "block"
+#define ITEM_INFO_TOGGLE_DETAILED "detailed"
 
 // =====[ PUBLIC ]=====
 
@@ -48,6 +49,12 @@ public int MenuHandler_Measure(Menu menu, MenuAction action, int param1, int par
 				DisplayMeasureMenu(param1, false);
 			}
 		}
+		else if (StrEqual(info, ITEM_INFO_TOGGLE_DETAILED, false))
+		{
+			CommandMeasureDetailed(param1, 0);
+			DisplayMeasureMenu(param1, false);
+			return 0;
+		}
 		
 		DisplayMeasureMenu(param1, false);
 	}
@@ -78,5 +85,14 @@ static void MeasureMenuAddItems(int client, Menu menu)
 	menu.AddItem(ITEM_INFO_GET_DISTANCE, display);
 	FormatEx(display, sizeof(display), "%T", "Measure Menu - Get Block Distance", client);
 	menu.AddItem(ITEM_INFO_GET_BLOCK_DISTANCE, display);
+	if (gB_MeasureDetailed[client])
+	{
+		FormatEx(display, sizeof(display), "%T - %T", "Measure Menu - Toggle Detailed", client, "Options Menu - Enabled", client);
+	}
+	else
+	{
+		FormatEx(display, sizeof(display), "%T - %T", "Measure Menu - Toggle Detailed", client, "Options Menu - Disabled", client);
+	}
+	menu.AddItem(ITEM_INFO_TOGGLE_DETAILED, display);
 }
 

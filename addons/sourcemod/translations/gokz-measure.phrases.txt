@@ -87,4 +87,8 @@
 		"chi"		"测量板子距离"
 		"ru"		"Узнать расстояние блока"
 	}
+	"Measure Menu - Toggle Detailed"
+	{
+		"en"		"Detailed Output"
+	}
 }
