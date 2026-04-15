@@ -339,9 +339,9 @@ SELECT j.JumpID, p.SteamID32, p.Alias, j.Block, j.Distance, j.Strafes, j.Sync, j
 			p.Cheater = 0 \
 	INNER JOIN \
 		( \
-			SELECT j.SteamID32, j.JumpType, j.Mode, j.IsBlockJump, MAX(j.Distance) BestDistance \
+			SELECT j2.SteamID32, j2.JumpType, j2.Mode, j2.IsBlockJump, MAX(j2.Distance) BestDistance \
 			    FROM \
-			        Jumpstats j \
+			        Jumpstats j2 \
 			    INNER JOIN \
 			        ( \
 			            SELECT SteamID32, MAX(Block) AS MaxBlockDist \
@@ -353,13 +353,13 @@ SELECT j.JumpID, p.SteamID32, p.Alias, j.Block, j.Distance, j.Strafes, j.Sync, j
 			                    IsBlockJump = %d \
 			                GROUP BY SteamID32 \
 			        ) MaxBlock ON \
-			            j.SteamID32 = MaxBlock.SteamID32 AND \
-			            j.Block = MaxBlock.MaxBlockDist \
+			            j2.SteamID32 = MaxBlock.SteamID32 AND \
+			            j2.Block = MaxBlock.MaxBlockDist \
 			    WHERE \
-			        j.JumpType = %d AND \
-			        j.Mode = %d AND \
-			        j.IsBlockJump = %d \
-			    GROUP BY j.SteamID32, j.JumpType, j.Mode, j.IsBlockJump \
+			        j2.JumpType = %d AND \
+			        j2.Mode = %d AND \
+			        j2.IsBlockJump = %d \
+			    GROUP BY j2.SteamID32, j2.JumpType, j2.Mode, j2.IsBlockJump \
 		) MaxDist ON \
 			j.SteamID32 = MaxDist.SteamID32 AND \
 			j.JumpType = MaxDist.JumpType AND \
