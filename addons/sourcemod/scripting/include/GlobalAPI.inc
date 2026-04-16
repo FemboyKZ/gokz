@@ -15,7 +15,7 @@
 
 static int DEFAULT_INT_ARRAY[1] = { -1 };
 
-#define GlobalAPI_Plugin_Version "2.1.0"
+#define GlobalAPI_Plugin_Version "2.0.0"
 #define GlobalAPI_Plugin_Desc "Plugin helper for GlobalAPI Production & Staging"
 #define GlobalAPI_Plugin_Url "https://bitbucket.org/kztimerglobalteam/GlobalAPI-SMPlugin"
 #define GlobalAPI_Plugin_NameVersion "GlobalAPI Plugin " ... GlobalAPI_Plugin_Version
