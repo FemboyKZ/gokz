@@ -49,6 +49,7 @@ public void OnPluginStart()
 	LoadTranslations("gokz-profile.phrases");
 	CreateGlobalForwards();
 	RegisterCommands();
+	HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Post);
 }
 
 public void OnAllPluginsLoaded()
@@ -130,6 +131,16 @@ public void GOKZ_OnOptionsLoaded(int client)
 	{
 		int mode = GOKZ_GetCoreOption(client, Option_Mode);
 		UpdateTags(client, gI_Rank[client][mode], mode);
+	}
+}
+
+public void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
+{
+	int client = GetClientOfUserId(event.GetInt("userid"));
+	if (IsValidClient(client) && !IsFakeClient(client))
+	{
+		int mode = GOKZ_GetCoreOption(client, Option_Mode);
+		UpdateRank(client, mode);
 	}
 }
 
