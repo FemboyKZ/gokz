@@ -19,6 +19,7 @@ GOKZ is a package of [SourceMod](https://www.sourcemod.net/about.php) plugins fo
 
 ```txt
 gokz-anticheat
+gokz-jumpbeam
 gokz-jumpstats
 gokz-localdb
 gokz-localranks
@@ -32,6 +33,7 @@ gokz-replays
 
 ```txt
 gokz-jumpstats
+gokz-jumpbeam
 gokz-localranks
 gokz-measure
 gokz-pistol
