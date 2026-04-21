@@ -62,7 +62,7 @@
 	{
 		"en"		"Meower"
 	}
-	"Options Menu - Tag Custom - Cat"
+	"Options Menu - Tag Custom - cat"
 	{
 		"en"		"cat"
 	}
