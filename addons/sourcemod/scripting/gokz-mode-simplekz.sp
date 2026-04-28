@@ -239,7 +239,7 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 		return;
 	}
 	
-	if (buttons & IN_JUMP)
+	if ((buttons & IN_JUMP) && !(gI_OldButtons[client] & IN_JUMP))
 	{
 		gI_LastJumpButtonCmdnum[client] = cmdnum;
 	}
@@ -559,19 +559,18 @@ Action TweakJump(KZPlayer player, float origin[3], float velocity[3])
 {
 	// TakeoffCmdnum and TakeoffSpeed is not defined here because the player technically hasn't taken off yet.
 	int cmdsSinceLanding = gI_Cmdnum[player.ID] - player.LandingCmdNum;
-	gB_HitTweakedPerf[player.ID] = cmdsSinceLanding <= 1
-	 || cmdsSinceLanding <= 3 && gI_Cmdnum[player.ID] - gI_LastJumpButtonCmdnum[player.ID] <= 3;
+	int ticksSinceLanding = gI_TickCount[player.ID] - Movement_GetLandingTick(player.ID);
+	gB_HitTweakedPerf[player.ID] = (cmdsSinceLanding <= 1
+	 || cmdsSinceLanding <= 3 && gI_Cmdnum[player.ID] - gI_LastJumpButtonCmdnum[player.ID] <= 3)
+	 && ticksSinceLanding <= 6;
 	
 	if (gB_HitTweakedPerf[player.ID])
 	{
-		if (cmdsSinceLanding <= 1)
-		{
-			NerfRealPerf(player, origin);
-		}
+		NerfRealPerf(player, origin);
 
 		ApplyTweakedTakeoffSpeed(player, velocity);
 
-		if (cmdsSinceLanding > 1 || player.TakeoffSpeed > SPEED_NORMAL)
+		if ((cmdsSinceLanding > 1 && cmdsSinceLanding <= 3) || player.TakeoffSpeed > SPEED_NORMAL)
 		{
 			// Restore prestrafe lost due to briefly being on the ground
 			gF_PSVelMod[player.ID] = gF_PSVelModLanding[player.ID];
