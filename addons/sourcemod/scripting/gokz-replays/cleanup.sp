@@ -13,6 +13,7 @@
 
 static ConVar gCV_MaxReplaysPerGroup;
 static ConVar gCV_MaxProReplaysPerGroup;
+static ConVar gCV_CleanupDryRun;
 
 
 
@@ -29,6 +30,9 @@ void OnPluginStart_Cleanup()
 	gCV_MaxProReplaysPerGroup = AutoExecConfig_CreateConVar("gokz_max_pro_replays_per_group", "3",
 		"Maximum number of pro (no-teleport) run replay files kept per (player, map, course, mode). Older/slower replays are deleted from disk.",
 		_, true, 2.0);
+	gCV_CleanupDryRun = AutoExecConfig_CreateConVar("gokz_replay_cleanup_dryrun", "0",
+		"If 1, replay cleanup logs the .replay files it would delete instead of deleting them. Use to verify the prune query before enabling deletion.",
+		_, true, 0.0, true, 1.0);
 
 	AutoExecConfig_ExecuteFile();
 	AutoExecConfig_CleanFile();
@@ -51,27 +55,7 @@ void OnTimeInserted_Cleanup(int steamID, int mapID, int course, int mode)
 	int maxPro = gCV_MaxProReplaysPerGroup.IntValue;
 
 	char query[2048];
-	FormatEx(query, sizeof(query),
-		"SELECT t.TimeGUID FROM Times t \
-		INNER JOIN MapCourses mc ON mc.MapCourseID = t.MapCourseID \
-		WHERE t.SteamID32 = %d AND mc.MapID = %d AND mc.Course = %d AND t.Mode = %d \
-		AND t.TimeGUID IS NOT NULL AND t.TimeGUID <> '' \
-		AND t.TimeID NOT IN ( \
-			SELECT TimeID FROM ( \
-				SELECT t2.TimeID FROM Times t2 \
-				INNER JOIN MapCourses mc2 ON mc2.MapCourseID = t2.MapCourseID \
-				WHERE t2.SteamID32 = %d AND mc2.MapID = %d AND mc2.Course = %d AND t2.Mode = %d \
-				ORDER BY t2.RunTime ASC LIMIT %d \
-			) AS keep_nub \
-		) \
-		AND t.TimeID NOT IN ( \
-			SELECT TimeID FROM ( \
-				SELECT t3.TimeID FROM Times t3 \
-				INNER JOIN MapCourses mc3 ON mc3.MapCourseID = t3.MapCourseID \
-				WHERE t3.SteamID32 = %d AND mc3.MapID = %d AND mc3.Course = %d AND t3.Mode = %d AND t3.Teleports = 0 \
-				ORDER BY t3.RunTime ASC LIMIT %d \
-			) AS keep_pro \
-		)",
+	FormatEx(query, sizeof(query), sql_cleanup_select_prunable,
 		steamID, mapID, course, mode,
 		steamID, mapID, course, mode, maxNub,
 		steamID, mapID, course, mode, maxPro);
@@ -91,6 +75,8 @@ public void SQL_DeleteOldReplaysCallback(Database db, DBResultSet results, const
 		return;
 	}
 
+	bool dryRun = gCV_CleanupDryRun.BoolValue;
+
 	char guid[GOKZ_DB_TIME_GUID_MAX];
 	char replayPath[PLATFORM_MAX_PATH];
 	while (results.FetchRow())
@@ -101,7 +87,15 @@ public void SQL_DeleteOldReplaysCallback(Database db, DBResultSet results, const
 			continue;
 		}
 		GOKZ_RP_FormatRunReplayPath(replayPath, sizeof(replayPath), guid);
-		if (FileExists(replayPath))
+		if (!FileExists(replayPath))
+		{
+			continue;
+		}
+		if (dryRun)
+		{
+			LogMessage("[gokz-replays cleanup dryrun] would delete %s", replayPath);
+		}
+		else
 		{
 			DeleteFile(replayPath);
 		}

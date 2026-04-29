@@ -52,6 +52,7 @@ DynamicDetour gH_DHooks_TeamFull;
 #include "gokz-replays/recording.sp"
 #include "gokz-replays/api.sp"
 #include "gokz-replays/controls.sp"
+#include "gokz-replays/db/sql.sp"
 #include "gokz-replays/cleanup.sp"
 
 
