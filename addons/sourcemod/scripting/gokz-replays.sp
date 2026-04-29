@@ -5,6 +5,8 @@
 #include <sdktools>
 #include <dhooks>
 
+#include <autoexecconfig>
+
 #include <movementapi>
 
 #include <gokz/core>
@@ -50,6 +52,7 @@ DynamicDetour gH_DHooks_TeamFull;
 #include "gokz-replays/recording.sp"
 #include "gokz-replays/api.sp"
 #include "gokz-replays/controls.sp"
+#include "gokz-replays/cleanup.sp"
 
 
 
@@ -69,6 +72,7 @@ public void OnPluginStart()
 	
 	HookEvents();
 	RegisterCommands();
+	OnPluginStart_Cleanup();
 }
 
 public void OnAllPluginsLoaded()
@@ -270,6 +274,11 @@ public void GOKZ_AC_OnPlayerSuspected(int client, ACReason reason)
 public void GOKZ_DB_OnJumpstatPB(int client, int jumptype, int mode, float distance, int block, int strafes, float sync, float pre, float max, int airtime)
 {
 	GOKZ_DB_OnJumpstatPB_Recording(client, jumptype, mode, distance, block, strafes, sync, pre, max, airtime);
+}
+
+public void GOKZ_DB_OnTimeInserted(int client, int steamID, int mapID, int course, int mode, int style, int runTimeMS, int teleportsUsed, const char[] guid)
+{
+	OnTimeInserted_Cleanup(steamID, mapID, course, mode);
 }
 
 public void GOKZ_OnOptionsLoaded(int client)
