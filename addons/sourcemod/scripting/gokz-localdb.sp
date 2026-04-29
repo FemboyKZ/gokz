@@ -176,7 +176,7 @@ public Action GOKZ_OnTimerStart(int client, int course)
 	FormatEx(gC_RunGUID[client], sizeof(gC_RunGUID[]), "%x-%x-%x-%x-%x", 
 		GetSteamAccountID(client), 
 		GetTime(), 
-		GetSysTickCount(),
+		view_as<int>(GetEngineTime()),
 		GetURandomInt(), 
 		gI_RunCounter);
 
