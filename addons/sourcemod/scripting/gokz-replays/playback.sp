@@ -719,7 +719,9 @@ static bool LoadFormatVersion2Or3Replay(File file, int client, int bot, int form
 	}
 	else
 	{
-		ReadTickStreamV2Format(file, bot, tickCount);
+		// Legacy v2: tick stream runs to EOF. -1 = no cap, refill until file ends.
+		ReadCache_SetFile(file, -1);
+		ReadTickStreamV2Format(bot, tickCount);
 	}
 
 	playbackTick[bot] = 0;
@@ -730,19 +732,23 @@ static bool LoadFormatVersion2Or3Replay(File file, int client, int bot, int form
 	return true;
 }
 
-static void ReadTickStreamV2Format(File file, int bot, int tickCount)
+static void ReadTickStreamV2Format(int bot, int tickCount)
 {
+	// Caller must call ReadCache_SetFile(file, ...) before invoking this function.
 	any tickData[RP_V2_TICK_DATA_BLOCKSIZE];
 	for (int i = 0; i < tickCount; i++)
 	{
-		file.ReadInt32(tickData[RPDELTA_DELTAFLAGS]);
+		if (!ReadCache_ReadInt32(tickData[RPDELTA_DELTAFLAGS]))
+		{
+			break;
+		}
 
 		for (int index = 1; index < sizeof(tickData); index++)
 		{
 			int currentFlag = (1 << index);
 			if (tickData[RPDELTA_DELTAFLAGS] & currentFlag)
 			{
-				file.ReadInt32(tickData[index]);
+				ReadCache_ReadInt32(tickData[index]);
 			}
 		}
 		
@@ -792,7 +798,8 @@ static bool ReadV3SectionStream(File file, int bot, int tickCount)
 			{
 				if (codec == RP_CODEC_RAW)
 				{
-					ReadTickStreamV2Format(file, bot, tickCount);
+					ReadCache_SetFile(file, length);
+					ReadTickStreamV2Format(bot, tickCount);
 				}
 				else
 				{
@@ -803,7 +810,8 @@ static bool ReadV3SectionStream(File file, int bot, int tickCount)
 			{
 				if (codec == RP_CODEC_RAW)
 				{
-					ReadNetStatsSection(file, bot);
+					ReadCache_SetFile(file, length);
+					ReadNetStatsSection(bot);
 				}
 				else
 				{
@@ -814,7 +822,8 @@ static bool ReadV3SectionStream(File file, int bot, int tickCount)
 			{
 				if (codec == RP_CODEC_RAW)
 				{
-					ReadWeaponsSection(file, bot);
+					ReadCache_SetFile(file, length);
+					ReadWeaponsSection(bot);
 				}
 				else
 				{
@@ -824,13 +833,14 @@ static bool ReadV3SectionStream(File file, int bot, int tickCount)
 			// Future tags fall through below.
 		}
 
-		// Always advance to end of payload to handle unknown tags, unknown codecs
-		// and the v2 tick reader's early-break HACK.
+		// Always advance to end of payload to handle unknown tags, unknown codecs,
+		// the v2 tick reader's early-break HACK, and any bytes the read cache pulled
+		// past the actual consumer position.
 		file.Seek(payloadStart + length, SEEK_SET);
 	}
 }
 
-static void ReadNetStatsSection(File file, int bot)
+static void ReadNetStatsSection(int bot)
 {
 	if (playbackNetStats[bot] == null)
 	{
@@ -842,7 +852,7 @@ static void ReadNetStatsSection(File file, int bot)
 	}
 
 	int n;
-	if (!file.ReadInt32(n) || n < 0)
+	if (!ReadCache_ReadInt32(n) || n < 0)
 	{
 		return;
 	}
@@ -855,11 +865,11 @@ static void ReadNetStatsSection(File file, int bot)
 		int latencyMs;
 		int lossIn, lossOut;
 		int chokeIn, chokeOut;
-		if (!file.ReadInt16(latencyMs)
-			|| !file.ReadInt16(lossIn)
-			|| !file.ReadInt16(lossOut)
-			|| !file.ReadInt16(chokeIn)
-			|| !file.ReadInt16(chokeOut))
+		if (!ReadCache_ReadInt16(latencyMs)
+			|| !ReadCache_ReadInt16(lossIn)
+			|| !ReadCache_ReadInt16(lossOut)
+			|| !ReadCache_ReadInt16(chokeIn)
+			|| !ReadCache_ReadInt16(chokeOut))
 		{
 			LogError("Truncated NETSTATS at entry %d/%d.", i, n);
 			playbackNetStats[bot].Resize(i);
@@ -874,7 +884,7 @@ static void ReadNetStatsSection(File file, int bot)
 	}
 }
 
-static void ReadWeaponsSection(File file, int bot)
+static void ReadWeaponsSection(int bot)
 {
 	if (playbackWeapons[bot] == null)
 	{
@@ -886,7 +896,7 @@ static void ReadWeaponsSection(File file, int bot)
 	}
 
 	int count;
-	if (!file.ReadInt8(count) || count < 0)
+	if (!ReadCache_ReadInt8(count) || count < 0)
 	{
 		return;
 	}
@@ -897,13 +907,13 @@ static void ReadWeaponsSection(File file, int bot)
 
 		int slot, defIndex, paintKit, seed, wearBits, statTrak;
 		int nameLen;
-		if (!file.ReadInt8(slot)
-			|| !file.ReadInt32(defIndex)
-			|| !file.ReadInt32(paintKit)
-			|| !file.ReadInt32(seed)
-			|| !file.ReadInt32(wearBits)
-			|| !file.ReadInt32(statTrak)
-			|| !file.ReadInt8(nameLen))
+		if (!ReadCache_ReadInt8(slot)
+			|| !ReadCache_ReadInt32(defIndex)
+			|| !ReadCache_ReadInt32(paintKit)
+			|| !ReadCache_ReadInt32(seed)
+			|| !ReadCache_ReadInt32(wearBits)
+			|| !ReadCache_ReadInt32(statTrak)
+			|| !ReadCache_ReadInt8(nameLen))
 		{
 			LogError("Truncated WEAPONS at entry %d/%d.", i, count);
 			return;
@@ -917,21 +927,21 @@ static void ReadWeaponsSection(File file, int bot)
 
 		if (nameLen > 0)
 		{
-			if (nameLen >= sizeof(ReplayWeaponEntry::nametag))
+			int copyLen = nameLen;
+			if (copyLen >= sizeof(ReplayWeaponEntry::nametag))
 			{
-				nameLen = sizeof(ReplayWeaponEntry::nametag) - 1;
+				copyLen = sizeof(ReplayWeaponEntry::nametag) - 1;
 			}
-			file.ReadString(entry.nametag, sizeof(ReplayWeaponEntry::nametag), nameLen);
-			entry.nametag[nameLen] = '\0';
+			ReadCache_ReadString(entry.nametag, sizeof(ReplayWeaponEntry::nametag), nameLen, copyLen);
 		}
 
 		for (int s = 0; s < RP_MAX_WEAPON_STICKERS; s++)
 		{
 			int kit, wear, scale, rotation;
-			if (!file.ReadInt32(kit)
-				|| !file.ReadInt32(wear)
-				|| !file.ReadInt32(scale)
-				|| !file.ReadInt32(rotation))
+			if (!ReadCache_ReadInt32(kit)
+				|| !ReadCache_ReadInt32(wear)
+				|| !ReadCache_ReadInt32(scale)
+				|| !ReadCache_ReadInt32(rotation))
 			{
 				LogError("Truncated WEAPONS sticker at entry %d sticker %d.", i, s);
 				return;
@@ -943,6 +953,181 @@ static void ReadWeaponsSection(File file, int bot)
 		}
 
 		playbackWeapons[bot].PushArray(entry);
+	}
+}
+
+// =====[ READ CACHE ]=====
+//
+// Mirror of recording.sp's WriteCache. Pulls bytes from disk in ~64 KB chunks instead of one IFileSystem syscall per ReadIntN.
+// Bytes are packed 4-per-cell little-endian (64 KB) and bulk-loaded via file.Read(buf, n, 4)
+//
+// Lifecycle:
+//   ReadCache_SetFile(file, sectionLength); // bind file + cap on bytes (-1 = unbounded)
+//   ReadCache_ReadInt32(...); // ...repeat for whole payload...
+//   file.Seek(payloadStart + sectionLength, SEEK_SET); // re-anchor file pos
+
+#define READ_CACHE_CELLS 16384
+#define READ_CACHE_BYTES (READ_CACHE_CELLS * 4)
+
+static File readCacheFile;
+static int readCache[READ_CACHE_CELLS];  // 4 bytes per cell, LE packed
+static int readCacheBytes;               // valid bytes in buffer
+static int readCachePos;                 // bytes consumed
+static int readCacheRemaining;           // bytes still pullable from file (-1 = unbounded)
+
+static void ReadCache_SetFile(File file, int byteCap)
+{
+	readCacheFile = file;
+	readCacheBytes = 0;
+	readCachePos = 0;
+	readCacheRemaining = byteCap;
+}
+
+static bool ReadCache_Refill()
+{
+	readCacheBytes = 0;
+	readCachePos = 0;
+
+	if (readCacheRemaining == 0)
+	{
+		return false;
+	}
+
+	int maxBytes = READ_CACHE_BYTES;
+	if (readCacheRemaining > 0 && maxBytes > readCacheRemaining)
+	{
+		maxBytes = readCacheRemaining;
+	}
+
+	// file.Read with size=4 reads 4 bytes per cell which on little-endian targets matches a per-byte stream.
+	int wantCells = maxBytes >> 2;
+	int gotCells = 0;
+	if (wantCells > 0)
+	{
+		gotCells = readCacheFile.Read(readCache, wantCells, 4);
+		if (gotCells < 0)
+		{
+			gotCells = 0;
+		}
+		readCacheBytes = gotCells << 2;
+		if (readCacheRemaining > 0)
+		{
+			readCacheRemaining -= readCacheBytes;
+		}
+	}
+
+	// Trailing 1-3 bytes (only at the last refill of a section whose length isn't a multiple of 4,
+	// or never if cap was already a cell-multiple).
+	// Skip if file came up short on cells, it's exhausted.
+	if (gotCells == wantCells)
+	{
+		int tail = maxBytes - readCacheBytes;
+		for (int i = 0; i < tail; i++)
+		{
+			int b;
+			if (!readCacheFile.ReadInt8(b))
+			{
+				break;
+			}
+			int byteIdx = readCacheBytes;
+			int cellIdx = byteIdx >> 2;
+			int shift = (byteIdx & 3) * 8;
+			if (shift == 0)
+			{
+				readCache[cellIdx] = b & 0xFF;
+			}
+			else
+			{
+				readCache[cellIdx] |= (b & 0xFF) << shift;
+			}
+			readCacheBytes++;
+			if (readCacheRemaining > 0)
+			{
+				readCacheRemaining--;
+			}
+		}
+	}
+
+	return readCacheBytes > 0;
+}
+
+static bool ReadCache_ReadByte(int &out)
+{
+	if (readCachePos >= readCacheBytes)
+	{
+		if (!ReadCache_Refill())
+		{
+			return false;
+		}
+	}
+	int cellIdx = readCachePos >> 2;
+	int shift = (readCachePos & 3) * 8;
+	out = (readCache[cellIdx] >> shift) & 0xFF;
+	readCachePos++;
+	return true;
+}
+
+static bool ReadCache_ReadInt8(int &v)
+{
+	return ReadCache_ReadByte(v);
+}
+
+static bool ReadCache_ReadInt16(int &v)
+{
+	int b0, b1;
+	if (!ReadCache_ReadByte(b0) || !ReadCache_ReadByte(b1))
+	{
+		return false;
+	}
+	v = b0 | (b1 << 8);
+	return true;
+}
+
+static bool ReadCache_ReadInt32(int &v)
+{
+	// Pull a whole cell in one op when the byte position is cell-aligned and the cell is fully present.
+	// TICKS reads only Int32s from payload offset 0, so it stays on this path end-to-end.
+	if ((readCachePos & 3) == 0 && readCachePos + 4 <= readCacheBytes)
+	{
+		v = readCache[readCachePos >> 2];
+		readCachePos += 4;
+		return true;
+	}
+
+	int b0, b1, b2, b3;
+	if (!ReadCache_ReadByte(b0) || !ReadCache_ReadByte(b1)
+		|| !ReadCache_ReadByte(b2) || !ReadCache_ReadByte(b3))
+	{
+		return false;
+	}
+	v = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
+	return true;
+}
+
+// Reads `byteCount` bytes from the stream, copies up to `copyCount` of them into `buf` (NUL-terminating),
+// and discards any remaining bytes. `copyCount` must be <= byteCount and <= maxLen-1.
+static void ReadCache_ReadString(char[] buf, int maxLen, int byteCount, int copyCount)
+{
+	int stored = 0;
+	for (int i = 0; i < byteCount; i++)
+	{
+		int b;
+		if (!ReadCache_ReadByte(b))
+		{
+			break;
+		}
+		if (stored < copyCount && stored < maxLen - 1)
+		{
+			buf[stored++] = b;
+		}
+	}
+	if (stored < maxLen)
+	{
+		buf[stored] = '\0';
+	}
+	else
+	{
+		buf[maxLen - 1] = '\0';
 	}
 }
 
