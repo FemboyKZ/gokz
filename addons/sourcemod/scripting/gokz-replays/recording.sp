@@ -745,7 +745,9 @@ static void WriteSectionNetStats(File file, int client, int replayType, int airt
 	file.WriteInt32(0); // uncompressedLength placeholder
 
 	int payloadStart = file.Position;
-	WriteNetStatsPayload(file, client, replayType, airtime);
+	WriteCache_SetFile(file);
+	WriteNetStatsPayload(client, replayType, airtime);
+	WriteCache_Flush();
 	int payloadEnd = file.Position;
 
 	int len = payloadEnd - payloadStart;
@@ -755,7 +757,7 @@ static void WriteSectionNetStats(File file, int client, int replayType, int airt
 	file.Seek(payloadEnd, SEEK_SET);
 }
 
-static void WriteNetStatsPayload(File file, int client, int replayType, int airtime)
+static void WriteNetStatsPayload(int client, int replayType, int airtime)
 {
 	ReplayNetStats netStats;
 
@@ -764,45 +766,45 @@ static void WriteNetStatsPayload(File file, int client, int replayType, int airt
 		case ReplayType_Run:
 		{
 			int n = recordedPostRunNetStats[client].Length;
-			file.WriteInt32(n);
+			WriteCache_WriteInt32(n);
 			for (int i = 0; i < n; i++)
 			{
 				recordedPostRunNetStats[client].GetArray(i, netStats);
-				WriteNetStatsEntry(file, netStats);
+				WriteNetStatsEntry(netStats);
 			}
 		}
 		case ReplayType_Cheater:
 		{
 			int n = recordedRecentNetStats[client].Length;
-			file.WriteInt32(n);
+			WriteCache_WriteInt32(n);
 			for (int i = 0; i < n; i++)
 			{
 				int rollingI = RecordingIndexAdd(client, i);
 				recordedRecentNetStats[client].GetArray(rollingI, netStats);
-				WriteNetStatsEntry(file, netStats);
+				WriteNetStatsEntry(netStats);
 			}
 		}
 		case ReplayType_Jump:
 		{
 			int n = 2 * preAndPostRunTickCount + airtime;
-			file.WriteInt32(n);
+			WriteCache_WriteInt32(n);
 			for (int i = 0; i < n; i++)
 			{
 				int rollingI = RecordingIndexAdd(client, i - n);
 				recordedRecentNetStats[client].GetArray(rollingI, netStats);
-				WriteNetStatsEntry(file, netStats);
+				WriteNetStatsEntry(netStats);
 			}
 		}
 	}
 }
 
-static void WriteNetStatsEntry(File file, ReplayNetStats netStats)
+static void WriteNetStatsEntry(ReplayNetStats netStats)
 {
-	file.WriteInt16(netStats.latencyMs);
-	file.WriteInt16(netStats.lossInX10k);
-	file.WriteInt16(netStats.lossOutX10k);
-	file.WriteInt16(netStats.chokeInX10k);
-	file.WriteInt16(netStats.chokeOutX10k);
+	WriteCache_WriteInt16(netStats.latencyMs);
+	WriteCache_WriteInt16(netStats.lossInX10k);
+	WriteCache_WriteInt16(netStats.lossOutX10k);
+	WriteCache_WriteInt16(netStats.chokeInX10k);
+	WriteCache_WriteInt16(netStats.chokeOutX10k);
 }
 
 // =====[ WEAPONS SECTION ]=====
@@ -820,7 +822,9 @@ static void WriteSectionWeapons(File file, int client)
 	file.WriteInt32(0);
 
 	int payloadStart = file.Position;
-	WriteWeaponsPayload(file, weapons);
+	WriteCache_SetFile(file);
+	WriteWeaponsPayload(weapons);
+	WriteCache_Flush();
 	int payloadEnd = file.Position;
 
 	int len = payloadEnd - payloadStart;
@@ -873,35 +877,35 @@ static void CaptureWeapons(int client, ArrayList weapons)
 	}
 }
 
-static void WriteWeaponsPayload(File file, ArrayList weapons)
+static void WriteWeaponsPayload(ArrayList weapons)
 {
-	file.WriteInt8(weapons.Length);
+	WriteCache_WriteInt8(weapons.Length);
 
 	ReplayWeaponEntry entry;
 	for (int i = 0; i < weapons.Length; i++)
 	{
 		weapons.GetArray(i, entry);
 
-		file.WriteInt8(entry.slot);
-		file.WriteInt32(entry.defIndex);
-		file.WriteInt32(entry.paintKit);
-		file.WriteInt32(entry.seed);
-		file.WriteInt32(view_as<int>(entry.wear));
-		file.WriteInt32(entry.statTrak);
+		WriteCache_WriteInt8(entry.slot);
+		WriteCache_WriteInt32(entry.defIndex);
+		WriteCache_WriteInt32(entry.paintKit);
+		WriteCache_WriteInt32(entry.seed);
+		WriteCache_WriteInt32(view_as<int>(entry.wear));
+		WriteCache_WriteInt32(entry.statTrak);
 
 		int nameLen = strlen(entry.nametag);
-		file.WriteInt8(nameLen);
+		WriteCache_WriteInt8(nameLen);
 		if (nameLen > 0)
 		{
-			file.WriteString(entry.nametag, false);
+			WriteCache_WriteString(entry.nametag, nameLen);
 		}
 
 		for (int s = 0; s < RP_MAX_WEAPON_STICKERS; s++)
 		{
-			file.WriteInt32(entry.stickerKit[s]);
-			file.WriteInt32(view_as<int>(entry.stickerWear[s]));
-			file.WriteInt32(view_as<int>(entry.stickerScale[s]));
-			file.WriteInt32(view_as<int>(entry.stickerRotation[s]));
+			WriteCache_WriteInt32(entry.stickerKit[s]);
+			WriteCache_WriteInt32(view_as<int>(entry.stickerWear[s]));
+			WriteCache_WriteInt32(view_as<int>(entry.stickerScale[s]));
+			WriteCache_WriteInt32(view_as<int>(entry.stickerRotation[s]));
 		}
 	}
 }
@@ -1156,27 +1160,78 @@ static void RemoveFromRunningTimers(int client, Handle timerToRemove)
 
 
 
-// =====[ WRITE CACHE HACK ]=====
+// =====[ WRITE CACHE ]=====
+//
+// Byte-addressable buffer that batches small file writes into one bulk write per ~64 KB to slash IFileSystem syscall count.
+// Each cell stores one byte (low 8 bits) so the buffer is flushed via file.Write(buf, n, 1).
+//
+// Usage:
+//   WriteCache_SetFile(file);
+//   WriteCache_WriteInt32(...); // ...repeat for whole payload...
+//   WriteCache_Flush();         // appends buffered bytes to file
+//
+// Autoflushes midwrite when full, so payloads larger than the buffer still work
 
 static File writeCacheFile;
-static int writeCacheNext = 0;
-static any writeCache[4096];
+static int writeCacheNext;     // bytes used
+static int writeCache[65536];  // one byte per cell (low 8 bits) => 64 KB capacity
+
 static void WriteCache_SetFile(File file)
 {
 	writeCacheFile = file;
 	writeCacheNext = 0;
 }
-static void WriteCache_WriteData(any data)
+
+static void WriteCache_Flush()
 {
-	if (writeCacheNext == sizeof(writeCache))
+	if (writeCacheNext > 0)
+	{
+		writeCacheFile.Write(writeCache, writeCacheNext, 1);
+		writeCacheNext = 0;
+	}
+}
+
+static void WriteCache_WriteInt8(int v)
+{
+	if (writeCacheNext + 1 > sizeof(writeCache))
 	{
 		WriteCache_Flush();
 	}
-	writeCache[writeCacheNext] = data;
-	writeCacheNext++;
+	writeCache[writeCacheNext++] = v & 0xFF;
 }
-static void WriteCache_Flush()
+
+static void WriteCache_WriteInt16(int v)
 {
-	writeCacheFile.Write(writeCache, writeCacheNext, 4);
-	writeCacheNext = 0;
+	if (writeCacheNext + 2 > sizeof(writeCache))
+	{
+		WriteCache_Flush();
+	}
+	writeCache[writeCacheNext++] = v & 0xFF;
+	writeCache[writeCacheNext++] = (v >> 8) & 0xFF;
+}
+
+static void WriteCache_WriteInt32(int v)
+{
+	if (writeCacheNext + 4 > sizeof(writeCache))
+	{
+		WriteCache_Flush();
+	}
+	writeCache[writeCacheNext++] = v & 0xFF;
+	writeCache[writeCacheNext++] = (v >> 8) & 0xFF;
+	writeCache[writeCacheNext++] = (v >> 16) & 0xFF;
+	writeCache[writeCacheNext++] = (v >> 24) & 0xFF;
+}
+
+static void WriteCache_WriteString(const char[] s, int byteCount)
+{
+	for (int i = 0; i < byteCount; i++)
+	{
+		WriteCache_WriteInt8(s[i]);
+	}
+}
+
+// Legacy alias kept for callers that pass `any` (a 4-byte cell).
+static void WriteCache_WriteData(any data)
+{
+	WriteCache_WriteInt32(view_as<int>(data));
 }
