@@ -26,6 +26,9 @@ static bool postRunRecording[MAXPLAYERS + 1];
 static ArrayList recordedRecentData[MAXPLAYERS + 1];
 static ArrayList recordedRunData[MAXPLAYERS + 1];
 static ArrayList recordedPostRunData[MAXPLAYERS + 1];
+static ArrayList recordedRecentNetStats[MAXPLAYERS + 1];
+static ArrayList recordedRunNetStats[MAXPLAYERS + 1];
+static ArrayList recordedPostRunNetStats[MAXPLAYERS + 1];
 static Handle runningRunBreatherTimer[MAXPLAYERS + 1];
 static ArrayList runningJumpstatTimers[MAXPLAYERS + 1];
 
@@ -115,6 +118,9 @@ void OnPlayerRunCmdPost_Recording(int client, int buttons, int tickCount, const 
 	tickData.laggedMovementValue = GetEntPropFloat(client, Prop_Send, "m_flLaggedMovementValue");
 	tickData.buttonsForced = GetEntProp(client, Prop_Data, "m_afButtonForced");
 
+	ReplayNetStats netStats;
+	CaptureNetStats(client, netStats);
+
 	// HACK: Reset teleport tick marker. Too bad!
 	if (isTeleportTick[client])
 	{
@@ -132,6 +138,8 @@ void OnPlayerRunCmdPost_Recording(int client, int buttons, int tickCount, const 
 			// We can still attempt to save the rest of the recording though.
 			recordedRunData[client].Resize(runTick + 1);
 			recordedRunData[client].SetArray(runTick, tickData);
+			recordedRunNetStats[client].Resize(runTick + 1);
+			recordedRunNetStats[client].SetArray(runTick, netStats);
 		}
 	}
 	if (postRunRecording[client])
@@ -141,6 +149,8 @@ void OnPlayerRunCmdPost_Recording(int client, int buttons, int tickCount, const 
 		{
 			recordedPostRunData[client].Resize(tick + 1);
 			recordedPostRunData[client].SetArray(tick, tickData);
+			recordedPostRunNetStats[client].Resize(tick + 1);
+			recordedPostRunNetStats[client].SetArray(tick, netStats);
 		}
 	}
 	
@@ -148,6 +158,7 @@ void OnPlayerRunCmdPost_Recording(int client, int buttons, int tickCount, const 
 	if (recordedRecentData[client].Length < maxCheaterReplayTicks)
 	{
 		recordedRecentData[client].Resize(recordedRecentData[client].Length + 1);
+		recordedRecentNetStats[client].Resize(recordedRecentData[client].Length);
 		recordingIndex[client] = recordingIndex[client] + 1 == maxCheaterReplayTicks ? 0 : recordingIndex[client] + 1;
 	}
 	else
@@ -156,6 +167,7 @@ void OnPlayerRunCmdPost_Recording(int client, int buttons, int tickCount, const 
 	}
 
 	recordedRecentData[client].SetArray(tick, tickData);
+	recordedRecentNetStats[client].SetArray(tick, netStats);
 }
 
 Action GOKZ_OnTimerStart_Recording(int client)
@@ -214,6 +226,12 @@ void GOKZ_OnTimerEnd_Recording(int client, int course, float time, int teleports
 	recordedPostRunData[client] = recordedRunData[client];
 	recordedRunData[client] = tmp;
 	recordedRunData[client].Clear();
+
+	// Mirror the swap for the parallel netStats arrays.
+	tmp = recordedPostRunNetStats[client];
+	recordedPostRunNetStats[client] = recordedRunNetStats[client];
+	recordedRunNetStats[client] = tmp;
+	recordedRunNetStats[client].Clear();
 
 	runningRunBreatherTimer[client] = CreateTimer(RP_PLAYBACK_BREATHER_TIME, Timer_EndRecording, data);
 	if (runningRunBreatherTimer[client] == INVALID_HANDLE)
@@ -379,12 +397,24 @@ static void ClearClientRecordingState(int client)
 	if (recordedPostRunData[client] == null)
 		recordedPostRunData[client] = new ArrayList(sizeof(ReplayTickData));
 
+	if (recordedRecentNetStats[client] == null)
+		recordedRecentNetStats[client] = new ArrayList(sizeof(ReplayNetStats));
+
+	if (recordedRunNetStats[client] == null)
+		recordedRunNetStats[client] = new ArrayList(sizeof(ReplayNetStats));
+
+	if (recordedPostRunNetStats[client] == null)
+		recordedPostRunNetStats[client] = new ArrayList(sizeof(ReplayNetStats));
+
 	if (runningJumpstatTimers[client] == null)
 		runningJumpstatTimers[client] = new ArrayList();
 
 	recordedRecentData[client].Clear();
 	recordedRunData[client].Clear();
 	recordedPostRunData[client].Clear();
+	recordedRecentNetStats[client].Clear();
+	recordedRunNetStats[client].Clear();
+	recordedPostRunNetStats[client].Clear();
 	runningJumpstatTimers[client].Clear();
 }
 
@@ -480,6 +510,8 @@ static bool SaveRecordingOfRun(int client, int mode, int style, int course, floa
 	file.WriteInt32(runHeader.teleportsUsed);
 
 	WriteSectionTicks(file, client, ReplayType_Run);
+	WriteSectionWeapons(file, client);
+	WriteSectionNetStats(file, client, ReplayType_Run);
 	WriteSectionEnd(file);
 
 	delete file;
@@ -517,6 +549,8 @@ static bool SaveRecordingOfCheater(int client, ACReason reason)
 	WriteGeneralHeader(file, generalHeader);
 	file.WriteInt8(view_as<int>(cheaterHeader.ACReason));
 	WriteSectionTicks(file, client, ReplayType_Cheater);
+	WriteSectionWeapons(file, client);
+	WriteSectionNetStats(file, client, ReplayType_Cheater);
 	WriteSectionEnd(file);
 
 	delete file;
@@ -571,6 +605,8 @@ static bool SaveRecordingOfJump(int client, int mode, int style, int jumptype, f
 	WriteGeneralHeader(file, generalHeader);
 	WriteJumpHeader(file, jumpHeader);
 	WriteSectionTicks(file, client, ReplayType_Jump, airtimeTicks);
+	WriteSectionWeapons(file, client);
+	WriteSectionNetStats(file, client, ReplayType_Jump, airtimeTicks);
 	WriteSectionEnd(file);
 
 	delete file;
@@ -673,6 +709,201 @@ static void WriteSectionTicks(File file, int client, int replayType, int airtime
 static void WriteSectionEnd(File file)
 {
 	file.WriteInt32(RP_SECTION_END);
+}
+
+// =====[ NETSTATS SECTION ]=====
+
+static void CaptureNetStats(int client, ReplayNetStats netStats)
+{
+	float latency = GetClientLatency(client, NetFlow_Both);
+	int latencyMs = RoundToNearest(latency * 1000.0);
+	if (latencyMs < 0) latencyMs = 0;
+	if (latencyMs > 32767) latencyMs = 32767;
+	netStats.latencyMs = latencyMs;
+
+	netStats.lossInX10k  = ScaleLossOrChoke(GetClientAvgLoss(client,  NetFlow_Incoming));
+	netStats.lossOutX10k = ScaleLossOrChoke(GetClientAvgLoss(client,  NetFlow_Outgoing));
+	netStats.chokeInX10k  = ScaleLossOrChoke(GetClientAvgChoke(client, NetFlow_Incoming));
+	netStats.chokeOutX10k = ScaleLossOrChoke(GetClientAvgChoke(client, NetFlow_Outgoing));
+}
+
+static int ScaleLossOrChoke(float value)
+{
+	int scaled = RoundToNearest(value * 10000.0);
+	if (scaled < 0) return 0;
+	if (scaled > 10000) return 10000;
+	return scaled;
+}
+
+static void WriteSectionNetStats(File file, int client, int replayType, int airtime = 0)
+{
+	file.WriteInt32(RP_SECTION_NETSTATS);
+	file.WriteInt8(RP_CODEC_RAW);
+
+	int lenPos = file.Position;
+	file.WriteInt32(0); // length placeholder
+	file.WriteInt32(0); // uncompressedLength placeholder
+
+	int payloadStart = file.Position;
+	WriteNetStatsPayload(file, client, replayType, airtime);
+	int payloadEnd = file.Position;
+
+	int len = payloadEnd - payloadStart;
+	file.Seek(lenPos, SEEK_SET);
+	file.WriteInt32(len);
+	file.WriteInt32(len);
+	file.Seek(payloadEnd, SEEK_SET);
+}
+
+static void WriteNetStatsPayload(File file, int client, int replayType, int airtime)
+{
+	ReplayNetStats netStats;
+
+	switch (replayType)
+	{
+		case ReplayType_Run:
+		{
+			int n = recordedPostRunNetStats[client].Length;
+			file.WriteInt32(n);
+			for (int i = 0; i < n; i++)
+			{
+				recordedPostRunNetStats[client].GetArray(i, netStats);
+				WriteNetStatsEntry(file, netStats);
+			}
+		}
+		case ReplayType_Cheater:
+		{
+			int n = recordedRecentNetStats[client].Length;
+			file.WriteInt32(n);
+			for (int i = 0; i < n; i++)
+			{
+				int rollingI = RecordingIndexAdd(client, i);
+				recordedRecentNetStats[client].GetArray(rollingI, netStats);
+				WriteNetStatsEntry(file, netStats);
+			}
+		}
+		case ReplayType_Jump:
+		{
+			int n = 2 * preAndPostRunTickCount + airtime;
+			file.WriteInt32(n);
+			for (int i = 0; i < n; i++)
+			{
+				int rollingI = RecordingIndexAdd(client, i - n);
+				recordedRecentNetStats[client].GetArray(rollingI, netStats);
+				WriteNetStatsEntry(file, netStats);
+			}
+		}
+	}
+}
+
+static void WriteNetStatsEntry(File file, ReplayNetStats netStats)
+{
+	file.WriteInt16(netStats.latencyMs);
+	file.WriteInt16(netStats.lossInX10k);
+	file.WriteInt16(netStats.lossOutX10k);
+	file.WriteInt16(netStats.chokeInX10k);
+	file.WriteInt16(netStats.chokeOutX10k);
+}
+
+// =====[ WEAPONS SECTION ]=====
+
+static void WriteSectionWeapons(File file, int client)
+{
+	ArrayList weapons = new ArrayList(sizeof(ReplayWeaponEntry));
+	CaptureWeapons(client, weapons);
+
+	file.WriteInt32(RP_SECTION_WEAPONS);
+	file.WriteInt8(RP_CODEC_RAW);
+
+	int lenPos = file.Position;
+	file.WriteInt32(0);
+	file.WriteInt32(0);
+
+	int payloadStart = file.Position;
+	WriteWeaponsPayload(file, weapons);
+	int payloadEnd = file.Position;
+
+	int len = payloadEnd - payloadStart;
+	file.Seek(lenPos, SEEK_SET);
+	file.WriteInt32(len);
+	file.WriteInt32(len);
+	file.Seek(payloadEnd, SEEK_SET);
+
+	delete weapons;
+}
+
+static void CaptureWeapons(int client, ArrayList weapons)
+{
+	int slots[] = { CS_SLOT_PRIMARY, CS_SLOT_SECONDARY, CS_SLOT_KNIFE };
+	for (int i = 0; i < sizeof(slots); i++)
+	{
+		int ent = GetPlayerWeaponSlot(client, slots[i]);
+		if (ent == -1)
+		{
+			continue;
+		}
+
+		ReplayWeaponEntry entry;
+		entry.slot = slots[i];
+		entry.defIndex = GetEntProp(ent, Prop_Send, "m_iItemDefinitionIndex");
+		entry.paintKit = GetEntProp(ent, Prop_Send, "m_nFallbackPaintKit");
+		entry.seed     = GetEntProp(ent, Prop_Send, "m_nFallbackSeed");
+		entry.wear     = GetEntPropFloat(ent, Prop_Send, "m_flFallbackWear");
+		entry.statTrak = HasEntProp(ent, Prop_Send, "m_nFallbackStatTrak")
+			? GetEntProp(ent, Prop_Send, "m_nFallbackStatTrak")
+			: -1;
+
+		if (HasEntProp(ent, Prop_Send, "m_szCustomName"))
+		{
+			GetEntPropString(ent, Prop_Send, "m_szCustomName", entry.nametag, sizeof(ReplayWeaponEntry::nametag));
+		}
+
+		// Stickers (m_Item is a CEconItemView; sticker arrays are addressed by
+		// "m_Item.m_Item.m_AttributeList.m_Attributes" in modern CS:GO.
+		// We just query the netprops if they exist so unsupported builds skip silently.)
+		for (int s = 0; s < RP_MAX_WEAPON_STICKERS; s++)
+		{
+			entry.stickerKit[s] = 0;
+			entry.stickerWear[s] = 0.0;
+			entry.stickerScale[s] = 0.0;
+			entry.stickerRotation[s] = 0.0;
+		}
+
+		weapons.PushArray(entry);
+	}
+}
+
+static void WriteWeaponsPayload(File file, ArrayList weapons)
+{
+	file.WriteInt8(weapons.Length);
+
+	ReplayWeaponEntry entry;
+	for (int i = 0; i < weapons.Length; i++)
+	{
+		weapons.GetArray(i, entry);
+
+		file.WriteInt8(entry.slot);
+		file.WriteInt32(entry.defIndex);
+		file.WriteInt32(entry.paintKit);
+		file.WriteInt32(entry.seed);
+		file.WriteInt32(view_as<int>(entry.wear));
+		file.WriteInt32(entry.statTrak);
+
+		int nameLen = strlen(entry.nametag);
+		file.WriteInt8(nameLen);
+		if (nameLen > 0)
+		{
+			file.WriteString(entry.nametag, false);
+		}
+
+		for (int s = 0; s < RP_MAX_WEAPON_STICKERS; s++)
+		{
+			file.WriteInt32(entry.stickerKit[s]);
+			file.WriteInt32(view_as<int>(entry.stickerWear[s]));
+			file.WriteInt32(view_as<int>(entry.stickerScale[s]));
+			file.WriteInt32(view_as<int>(entry.stickerRotation[s]));
+		}
+	}
 }
 
 static void WriteTickData(File file, int client, int replayType, int airtime = 0)

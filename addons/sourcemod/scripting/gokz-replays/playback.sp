@@ -12,6 +12,8 @@ static int preAndPostRunTickCount;
 
 static int playbackTick[RP_MAX_BOTS];
 static ArrayList playbackTickData[RP_MAX_BOTS];
+static ArrayList playbackNetStats[RP_MAX_BOTS];
+static ArrayList playbackWeapons[RP_MAX_BOTS];
 static bool inBreather[RP_MAX_BOTS];
 static float breatherStartTime[RP_MAX_BOTS];
 
@@ -299,6 +301,14 @@ void OnClientDisconnect_Playback(int client)
 		{
 			playbackTickData[bot].Clear(); // Clear it all out
 			botDataLoaded[bot] = false;
+		}
+		if (playbackNetStats[bot] != null)
+		{
+			playbackNetStats[bot].Clear();
+		}
+		if (playbackWeapons[bot] != null)
+		{
+			playbackWeapons[bot].Clear();
 		}
 	}
 }
@@ -789,12 +799,150 @@ static bool ReadV3SectionStream(File file, int bot, int tickCount)
 					LogError("Unknown codec %d for TICKS section, skipping.", codec);
 				}
 			}
+			case RP_SECTION_NETSTATS:
+			{
+				if (codec == RP_CODEC_RAW)
+				{
+					ReadNetStatsSection(file, bot);
+				}
+				else
+				{
+					LogError("Unknown codec %d for NETSTATS section, skipping.", codec);
+				}
+			}
+			case RP_SECTION_WEAPONS:
+			{
+				if (codec == RP_CODEC_RAW)
+				{
+					ReadWeaponsSection(file, bot);
+				}
+				else
+				{
+					LogError("Unknown codec %d for WEAPONS section, skipping.", codec);
+				}
+			}
 			// Future tags fall through below.
 		}
 
 		// Always advance to end of payload to handle unknown tags, unknown codecs
 		// and the v2 tick reader's early-break HACK.
 		file.Seek(payloadStart + length, SEEK_SET);
+	}
+}
+
+static void ReadNetStatsSection(File file, int bot)
+{
+	if (playbackNetStats[bot] == null)
+	{
+		playbackNetStats[bot] = new ArrayList(sizeof(ReplayNetStats));
+	}
+	else
+	{
+		playbackNetStats[bot].Clear();
+	}
+
+	int n;
+	if (!file.ReadInt32(n) || n < 0)
+	{
+		return;
+	}
+
+	playbackNetStats[bot].Resize(n);
+
+	ReplayNetStats netStats;
+	for (int i = 0; i < n; i++)
+	{
+		int latencyMs;
+		int lossIn, lossOut;
+		int chokeIn, chokeOut;
+		if (!file.ReadInt16(latencyMs)
+			|| !file.ReadInt16(lossIn)
+			|| !file.ReadInt16(lossOut)
+			|| !file.ReadInt16(chokeIn)
+			|| !file.ReadInt16(chokeOut))
+		{
+			LogError("Truncated NETSTATS at entry %d/%d.", i, n);
+			playbackNetStats[bot].Resize(i);
+			return;
+		}
+		netStats.latencyMs = latencyMs;
+		netStats.lossInX10k = lossIn;
+		netStats.lossOutX10k = lossOut;
+		netStats.chokeInX10k = chokeIn;
+		netStats.chokeOutX10k = chokeOut;
+		playbackNetStats[bot].SetArray(i, netStats);
+	}
+}
+
+static void ReadWeaponsSection(File file, int bot)
+{
+	if (playbackWeapons[bot] == null)
+	{
+		playbackWeapons[bot] = new ArrayList(sizeof(ReplayWeaponEntry));
+	}
+	else
+	{
+		playbackWeapons[bot].Clear();
+	}
+
+	int count;
+	if (!file.ReadInt8(count) || count < 0)
+	{
+		return;
+	}
+
+	for (int i = 0; i < count; i++)
+	{
+		ReplayWeaponEntry entry;
+
+		int slot, defIndex, paintKit, seed, wearBits, statTrak;
+		int nameLen;
+		if (!file.ReadInt8(slot)
+			|| !file.ReadInt32(defIndex)
+			|| !file.ReadInt32(paintKit)
+			|| !file.ReadInt32(seed)
+			|| !file.ReadInt32(wearBits)
+			|| !file.ReadInt32(statTrak)
+			|| !file.ReadInt8(nameLen))
+		{
+			LogError("Truncated WEAPONS at entry %d/%d.", i, count);
+			return;
+		}
+		entry.slot = slot;
+		entry.defIndex = defIndex;
+		entry.paintKit = paintKit;
+		entry.seed = seed;
+		entry.wear = view_as<float>(wearBits);
+		entry.statTrak = statTrak;
+
+		if (nameLen > 0)
+		{
+			if (nameLen >= sizeof(ReplayWeaponEntry::nametag))
+			{
+				nameLen = sizeof(ReplayWeaponEntry::nametag) - 1;
+			}
+			file.ReadString(entry.nametag, sizeof(ReplayWeaponEntry::nametag), nameLen);
+			entry.nametag[nameLen] = '\0';
+		}
+
+		for (int s = 0; s < RP_MAX_WEAPON_STICKERS; s++)
+		{
+			int kit, wear, scale, rotation;
+			if (!file.ReadInt32(kit)
+				|| !file.ReadInt32(wear)
+				|| !file.ReadInt32(scale)
+				|| !file.ReadInt32(rotation))
+			{
+				LogError("Truncated WEAPONS sticker at entry %d sticker %d.", i, s);
+				return;
+			}
+			entry.stickerKit[s] = kit;
+			entry.stickerWear[s] = view_as<float>(wear);
+			entry.stickerScale[s] = view_as<float>(scale);
+			entry.stickerRotation[s] = view_as<float>(rotation);
+		}
+
+		playbackWeapons[bot].PushArray(entry);
 	}
 }
 

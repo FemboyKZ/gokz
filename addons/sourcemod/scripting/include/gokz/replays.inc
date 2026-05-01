@@ -124,6 +124,34 @@ enum struct ReplayTickData
 	int buttonsForced;
 }
 
+// latencyMs = clamp(latencySeconds * 1000, 0..32767)
+// loss/choke X10k = clamp(GetClientAvg* * 10000, 0..10000)
+enum struct ReplayNetStats
+{
+	int latencyMs;
+	int lossInX10k;
+	int lossOutX10k;
+	int chokeInX10k;
+	int chokeOutX10k;
+}
+
+#define RP_MAX_WEAPON_STICKERS 5
+
+enum struct ReplayWeaponEntry
+{
+	int slot;       // CS_SLOT_*
+	int defIndex;   // m_iItemDefinitionIndex
+	int paintKit;   // m_nFallbackPaintKit
+	int seed;       // m_nFallbackSeed
+	float wear;     // m_flFallbackWear
+	int statTrak;   // m_nFallbackStatTrak (-1 if not stattrak)
+	char nametag[32];
+	int   stickerKit[RP_MAX_WEAPON_STICKERS];
+	float stickerWear[RP_MAX_WEAPON_STICKERS];
+	float stickerScale[RP_MAX_WEAPON_STICKERS];
+	float stickerRotation[RP_MAX_WEAPON_STICKERS];
+}
+
 
 
 // =====[ CONSTANTS ]=====
@@ -143,11 +171,9 @@ enum struct ReplayTickData
 // Section tags. Keep numeric values stable forever.
 #define RP_SECTION_END     0  // Terminator. No codec/length fields follow.
 #define RP_SECTION_TICKS   1  // Mandatory. Delta-encoded tick stream (v2 layout).
-#define RP_SECTION_EVENTS  2  // Timer/mode/style/teleport events.
-#define RP_SECTION_COURSE  3  // Course name + split/cpz/stage timings.
-#define RP_SECTION_WEAPONS 4  // Econ/skin/sticker info per weapon.
-#define RP_SECTION_CMDDATA 5  // Per tick anticheat metadata (latency, loss, etc).
-#define RP_SECTION_MD5     6  // Mode/style md5 verification table.
+#define RP_SECTION_WEAPONS 2  // Econ/skin/sticker info per weapon.
+#define RP_SECTION_NETSTATS 3  // Per tick network channel telemetry (latency, loss, choke).
+#define RP_SECTION_MD5     4  // Mode/style md5 verification table.
 
 // Section payload codecs.
 #define RP_CODEC_RAW  0
