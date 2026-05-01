@@ -14,6 +14,19 @@ static int playbackTick[RP_MAX_BOTS];
 static ArrayList playbackTickData[RP_MAX_BOTS];
 static ArrayList playbackNetStats[RP_MAX_BOTS];
 static ArrayList playbackWeapons[RP_MAX_BOTS];
+
+// When tickStreamActive[bot] is true, ticks are not preloaded into playbackTickData[bot],
+// they are decoded on demand from the file using a small sliding window backed by a keyframe index.
+static bool tickStreamActive[RP_MAX_BOTS];
+static File tickStreamFile[RP_MAX_BOTS];
+static int tickStreamPayloadStart[RP_MAX_BOTS];
+static int tickStreamTickCount[RP_MAX_BOTS];
+static ArrayList tickStreamKeyframes[RP_MAX_BOTS]; // entries: int[2] = {tickIndex, payloadOffset}
+static ArrayList tickStreamWindow[RP_MAX_BOTS];
+static int tickStreamWindowStart[RP_MAX_BOTS];
+static int tickStreamCursor[RP_MAX_BOTS];
+static bool tickStreamFileAtCursor[RP_MAX_BOTS];
+static any tickStreamAccum[RP_MAX_BOTS][RP_V2_TICK_DATA_BLOCKSIZE];
 static bool inBreather[RP_MAX_BOTS];
 static float breatherStartTime[RP_MAX_BOTS];
 
@@ -115,7 +128,7 @@ void GetPlaybackState(int client, HUDInfo info)
 	}
 	if (i == RP_MAX_BOTS + 1) return;
 	
-	if (playbackTickData[bot] == INVALID_HANDLE)
+	if (!Tick_IsLoaded(bot))
 	{
 		return;
 	}
@@ -131,7 +144,7 @@ void GetPlaybackState(int client, HUDInfo info)
 		{
 			info.Time = 0.0;
 		}
-		else if (playbackTick[bot] >= playbackTickData[bot].Length - preAndPostRunTickCount)
+		else if (playbackTick[bot] >= Tick_Length(bot) - preAndPostRunTickCount)
 		{
 			info.Time = botTime[bot];
 		}
@@ -194,7 +207,7 @@ void PlaybackTogglePause(int bot)
 
 void PlaybackSkipForward(int bot)
 {
-	if (playbackTick[bot] + RoundToZero(RP_SKIP_TIME / GetTickInterval()) < playbackTickData[bot].Length)
+	if (playbackTick[bot] + RoundToZero(RP_SKIP_TIME / GetTickInterval()) < Tick_Length(bot))
 	{
 		PlaybackSkipToTick(bot, playbackTick[bot] + RoundToZero(RP_SKIP_TIME / GetTickInterval()));
 	}
@@ -227,7 +240,7 @@ void TrySkipToTime(int client, int seconds)
 	int tick = seconds * 128 + preAndPostRunTickCount;
 	int bot = GetBotFromClient(GetObserverTarget(client));
 	
-	if (tick >= 0 && tick < playbackTickData[bot].Length)
+	if (tick >= 0 && tick < Tick_Length(bot))
 	{
 		PlaybackSkipToTick(bot, tick);
 	}
@@ -243,7 +256,7 @@ float GetPlaybackTime(int bot)
 	{
 		return 0.0;
 	}
-	if (playbackTick[bot] >= playbackTickData[bot].Length - preAndPostRunTickCount)
+	if (playbackTick[bot] >= Tick_Length(bot) - preAndPostRunTickCount)
 	{
 		return botTime[bot];
 	}
@@ -297,9 +310,9 @@ void OnClientDisconnect_Playback(int client)
 		}
 		
 		botInGame[bot] = false;
-		if (playbackTickData[bot] != null)
+		if (Tick_IsLoaded(bot))
 		{
-			playbackTickData[bot].Clear(); // Clear it all out
+			Tick_Free(bot);
 			botDataLoaded[bot] = false;
 		}
 		if (playbackNetStats[bot] != null)
@@ -696,14 +709,17 @@ static bool LoadFormatVersion2Or3Replay(File file, int client, int bot, int form
 	}
 
 	// Tick Data
-	// Setup playback tick data array list
-	if (playbackTickData[bot] == null)
+	// v3 streams ticks on demand and never populates playbackTickData[bot].
+	if (formatVersion < 3)
 	{
-		playbackTickData[bot] = new ArrayList(IntMax(RP_V1_TICK_DATA_BLOCKSIZE, sizeof(ReplayTickData)));
-	}
-	else
-	{
-		playbackTickData[bot].Clear();
+		if (playbackTickData[bot] == null)
+		{
+			playbackTickData[bot] = new ArrayList(IntMax(RP_V1_TICK_DATA_BLOCKSIZE, sizeof(ReplayTickData)));
+		}
+		else
+		{
+			playbackTickData[bot].Clear();
+		}
 	}
 	
 	// Read tick data
@@ -713,6 +729,7 @@ static bool LoadFormatVersion2Or3Replay(File file, int client, int bot, int form
 	{
 		if (!ReadV3SectionStream(file, bot, tickCount))
 		{
+			TickStream_Free(bot);
 			delete file;
 			return false;
 		}
@@ -726,8 +743,12 @@ static bool LoadFormatVersion2Or3Replay(File file, int client, int bot, int form
 
 	playbackTick[bot] = 0;
 	botDataLoaded[bot] = true;
-	
-	delete file;
+
+	// streaming keeps the file handle open via tickStreamFile[bot].
+	if (!tickStreamActive[bot])
+	{
+		delete file;
+	}
 
 	return true;
 }
@@ -798,8 +819,12 @@ static bool ReadV3SectionStream(File file, int bot, int tickCount)
 			{
 				if (codec == RP_CODEC_RAW)
 				{
-					ReadCache_SetFile(file, length);
-					ReadTickStreamV2Format(bot, tickCount);
+					// File handle ownership transfers to TickStream and must NOT be deleted by caller.
+					if (!TickStream_Init(bot, file, payloadStart, length, tickCount))
+					{
+						LogError("Failed to initialize tick stream for bot %d.", bot);
+						return false;
+					}
 				}
 				else
 				{
@@ -1131,6 +1156,318 @@ static void ReadCache_ReadString(char[] buf, int maxLen, int byteCount, int copy
 	}
 }
 
+// =====[ TICK STREAM ]=====
+//
+// At load time we read only the keyframe index trailer
+// Tick data is decoded into a small sliding window around the current playback tick.
+// On miss we either decode forward from the cursor (cheap, sequential play)
+// or seek to the largest keyframe with tickIndex <= target (random skip).
+
+#define TICK_WINDOW_BEHIND_TICKS 64
+#define TICK_WINDOW_AHEAD_TICKS 192
+#define TICK_WINDOW_MAX_TICKS 384
+
+// Read the keyframe trailer at the end of the TICKS section payload.
+// Layout: <ticks bytes...> { u32 tickIndex, u32 fileOffset } * count, u32 count.
+// Returns true on success.
+static bool TickStream_ReadKeyframeTrailer(File file, int payloadStart, int payloadLength, ArrayList keyframes)
+{
+	if (payloadLength < 4)
+	{
+		LogError("TICKS payload too short for keyframe trailer (%d bytes).", payloadLength);
+		return false;
+	}
+
+	int countOffset = payloadStart + payloadLength - 4;
+	file.Seek(countOffset, SEEK_SET);
+	int count;
+	if (!file.ReadInt32(count) || count < 0)
+	{
+		LogError("Truncated keyframe trailer count.");
+		return false;
+	}
+
+	int trailerSize = 4 + count * 8;
+	if (trailerSize > payloadLength)
+	{
+		LogError("Keyframe trailer count %d implies %d bytes but payload is only %d.", count, trailerSize, payloadLength);
+		return false;
+	}
+
+	int entriesStart = payloadStart + payloadLength - trailerSize;
+	file.Seek(entriesStart, SEEK_SET);
+	for (int i = 0; i < count; i++)
+	{
+		int entry[2];
+		if (!file.ReadInt32(entry[0]) || !file.ReadInt32(entry[1]))
+		{
+			LogError("Truncated keyframe entry %d/%d.", i, count);
+			return false;
+		}
+		keyframes.PushArray(entry, sizeof(entry));
+	}
+	return true;
+}
+
+// Bind the bot to a streaming TICKS section. Takes ownership of `file` (kept open).
+static bool TickStream_Init(int bot, File file, int payloadStart, int payloadLength, int tickCount)
+{
+	TickStream_Free(bot);
+
+	ArrayList keyframes = new ArrayList(2);
+	if (!TickStream_ReadKeyframeTrailer(file, payloadStart, payloadLength, keyframes))
+	{
+		delete keyframes;
+		return false;
+	}
+	if (keyframes.Length == 0)
+	{
+		LogError("TICKS section has no keyframes; refusing to stream.");
+		delete keyframes;
+		return false;
+	}
+
+	tickStreamActive[bot] = true;
+	tickStreamFile[bot] = file;
+	tickStreamPayloadStart[bot] = payloadStart;
+	tickStreamTickCount[bot] = tickCount;
+	tickStreamKeyframes[bot] = keyframes;
+	tickStreamWindow[bot] = new ArrayList(sizeof(ReplayTickData));
+	tickStreamWindowStart[bot] = 0;
+	tickStreamCursor[bot] = 0;
+	// ReadV3SectionStream owns the file position right after Init returns and will
+	// seek past this section to read the next one, so the first decode must reseek.
+	tickStreamFileAtCursor[bot] = false;
+	for (int i = 0; i < RP_V2_TICK_DATA_BLOCKSIZE; i++)
+	{
+		tickStreamAccum[bot][i] = 0;
+	}
+	return true;
+}
+
+static void TickStream_Free(int bot)
+{
+	if (!tickStreamActive[bot])
+	{
+		return;
+	}
+	if (tickStreamFile[bot] != null)
+	{
+		delete tickStreamFile[bot];
+	}
+	if (tickStreamKeyframes[bot] != null)
+	{
+		delete tickStreamKeyframes[bot];
+	}
+	if (tickStreamWindow[bot] != null)
+	{
+		delete tickStreamWindow[bot];
+	}
+	tickStreamActive[bot] = false;
+	tickStreamWindowStart[bot] = 0;
+	tickStreamCursor[bot] = 0;
+	tickStreamFileAtCursor[bot] = false;
+	tickStreamTickCount[bot] = 0;
+	tickStreamPayloadStart[bot] = 0;
+}
+
+// Decode one tick from current file position into accumulator and append to window.
+// Caller must ensure file is positioned correctly and cursor < tickCount.
+static bool TickStream_DecodeOne(int bot)
+{
+	File file = tickStreamFile[bot];
+	int deltaFlags;
+	if (!file.ReadInt32(deltaFlags))
+	{
+		return false;
+	}
+	tickStreamAccum[bot][RPDELTA_DELTAFLAGS] = deltaFlags;
+	for (int i = 1; i < RP_V2_TICK_DATA_BLOCKSIZE; i++)
+	{
+		if (deltaFlags & (1 << i))
+		{
+			int v;
+			if (!file.ReadInt32(v))
+			{
+				return false;
+			}
+			tickStreamAccum[bot][i] = v;
+		}
+	}
+	tickStreamWindow[bot].PushArray(tickStreamAccum[bot], sizeof(tickStreamAccum[]));
+	tickStreamCursor[bot]++;
+	return true;
+}
+
+// Find largest keyframe with tickIndex <= target. Returns keyframe array index (>= 0).
+static int TickStream_FindKeyframe(int bot, int targetTick)
+{
+	ArrayList keyframes = tickStreamKeyframes[bot];
+	int lo = 0;
+	int hi = keyframes.Length - 1;
+	int best = 0;
+	int entry[2];
+	while (lo <= hi)
+	{
+		int mid = (lo + hi) >> 1;
+		keyframes.GetArray(mid, entry, sizeof(entry));
+		if (entry[0] <= targetTick)
+		{
+			best = mid;
+			lo = mid + 1;
+		}
+		else
+		{
+			hi = mid - 1;
+		}
+	}
+	return best;
+}
+
+// Trim the front of the window so it holds at most TICK_WINDOW_MAX_TICKS entries
+// and at most TICK_WINDOW_BEHIND_TICKS behind the access tick.
+static void TickStream_TrimFront(int bot, int accessTick)
+{
+	ArrayList window = tickStreamWindow[bot];
+	int targetStart = accessTick - TICK_WINDOW_BEHIND_TICKS;
+	if (targetStart < 0)
+	{
+		targetStart = 0;
+	}
+	// Also enforce hard cap.
+	int hardStart = tickStreamWindowStart[bot] + window.Length - TICK_WINDOW_MAX_TICKS;
+	if (hardStart > targetStart)
+	{
+		targetStart = hardStart;
+	}
+	int dropCount = targetStart - tickStreamWindowStart[bot];
+	if (dropCount <= 0)
+	{
+		return;
+	}
+	if (dropCount >= window.Length)
+	{
+		window.Clear();
+		tickStreamWindowStart[bot] = targetStart;
+		return;
+	}
+	for (int i = 0; i < dropCount; i++)
+	{
+		window.Erase(0);
+	}
+	tickStreamWindowStart[bot] = targetStart;
+}
+
+// Ensure tickIdx is materialized in the window. Returns relative index (>= 0) on success
+// or -1 on failure (out of range, file error).
+static int TickStream_Materialize(int bot, int tickIdx)
+{
+	if (tickIdx < 0 || tickIdx >= tickStreamTickCount[bot])
+	{
+		return -1;
+	}
+
+	ArrayList window = tickStreamWindow[bot];
+	int rel = tickIdx - tickStreamWindowStart[bot];
+
+	// Already in window?
+	if (rel >= 0 && rel < window.Length)
+	{
+		return rel;
+	}
+
+	int cursor = tickStreamCursor[bot];
+
+	bool canExtend = tickStreamFileAtCursor[bot]
+		&& tickIdx >= cursor
+		&& tickIdx - cursor < TICK_WINDOW_AHEAD_TICKS;
+	if (!canExtend)
+	{
+		// Backward or far jump (or first decode after load): seek to keyframe.
+		int kfIdx = TickStream_FindKeyframe(bot, tickIdx);
+		int entry[2];
+		tickStreamKeyframes[bot].GetArray(kfIdx, entry, sizeof(entry));
+		tickStreamFile[bot].Seek(tickStreamPayloadStart[bot] + entry[1], SEEK_SET);
+		tickStreamFileAtCursor[bot] = true;
+		for (int i = 0; i < RP_V2_TICK_DATA_BLOCKSIZE; i++)
+		{
+			tickStreamAccum[bot][i] = 0;
+		}
+		window.Clear();
+		tickStreamWindowStart[bot] = entry[0];
+		tickStreamCursor[bot] = entry[0];
+		cursor = entry[0];
+	}
+
+	// Decode forward up to and including tickIdx.
+	int decodeUntil = tickIdx + 1;
+	if (decodeUntil > tickStreamTickCount[bot])
+	{
+		decodeUntil = tickStreamTickCount[bot];
+	}
+	while (tickStreamCursor[bot] < decodeUntil)
+	{
+		if (!TickStream_DecodeOne(bot))
+		{
+			LogError("TickStream decode failed at tick %d (target %d).", tickStreamCursor[bot], tickIdx);
+			tickStreamFileAtCursor[bot] = false;
+			return -1;
+		}
+	}
+
+	TickStream_TrimFront(bot, tickIdx);
+	return tickIdx - tickStreamWindowStart[bot];
+}
+
+// =====[ TICK ACCESSOR DISPATCHERS ]=====
+//
+// These wrap the v1/v2 ArrayList path and the v3 streaming path so the rest
+// of playback.sp doesn't need to care which storage mode a bot is in.
+// v1 still accesses fields by index via playbackTickData[bot].Get(tick, n) directly (legacy 7-cell layout, never streams).
+
+static int Tick_Length(int bot)
+{
+	if (tickStreamActive[bot])
+	{
+		return tickStreamTickCount[bot];
+	}
+	return playbackTickData[bot] != null ? playbackTickData[bot].Length : 0;
+}
+
+static bool Tick_IsLoaded(int bot)
+{
+	return tickStreamActive[bot] || playbackTickData[bot] != null;
+}
+
+static void Tick_Free(int bot)
+{
+	if (tickStreamActive[bot])
+	{
+		TickStream_Free(bot);
+	}
+	if (playbackTickData[bot] != null)
+	{
+		playbackTickData[bot].Clear();
+	}
+}
+
+static void Tick_GetArray(int bot, int tickIdx, ReplayTickData out)
+{
+	if (tickStreamActive[bot])
+	{
+		int rel = TickStream_Materialize(bot, tickIdx);
+		if (rel < 0)
+		{
+			ReplayTickData blank;
+			out = blank;
+			return;
+		}
+		tickStreamWindow[bot].GetArray(rel, out);
+		return;
+	}
+	playbackTickData[bot].GetArray(tickIdx, out);
+}
+
 static void PlaybackVersion1(int client, int bot, int &buttons)
 {		
 	int size = playbackTickData[bot].Length;
@@ -1309,7 +1646,7 @@ static void PlaybackVersion1(int client, int bot, int &buttons)
 }
 void PlaybackVersion2(int client, int bot, int &buttons, float vel[3], float angles[3])
 {
-	int size = playbackTickData[bot].Length;
+	int size = Tick_Length(bot);
 	ReplayTickData prevTickData;
 	ReplayTickData currentTickData;
 	
@@ -1317,8 +1654,8 @@ void PlaybackVersion2(int client, int bot, int &buttons, float vel[3], float ang
 	if (playbackTick[bot] == 0 || playbackTick[bot] == (size - 1))
 	{
 		// Move the bot and pause them at that tick
-		playbackTickData[bot].GetArray(playbackTick[bot], currentTickData);
-		playbackTickData[bot].GetArray(IntMax(playbackTick[bot] - 1, 0), prevTickData);
+		Tick_GetArray(bot, playbackTick[bot], currentTickData);
+		Tick_GetArray(bot, IntMax(playbackTick[bot] - 1, 0), prevTickData);
 		TeleportEntity(client, currentTickData.origin, currentTickData.angles, view_as<float>( { 0.0, 0.0, 0.0 } ));
 		
 		if (!inBreather[bot])
@@ -1337,7 +1674,7 @@ void PlaybackVersion2(int client, int bot, int &buttons, float vel[3], float ang
 			playbackTick[bot]++;
 			if (playbackTick[bot] == size)
 			{
-				playbackTickData[bot].Clear(); // Clear it all out
+				Tick_Free(bot);
 				botDataLoaded[bot] = false;
 				CancelReplayControlsForBot(bot);
 				ServerCommand("bot_kick %s", botName[bot]);
@@ -1357,7 +1694,7 @@ void PlaybackVersion2(int client, int bot, int &buttons, float vel[3], float ang
 		}
 		if (spec == MAXPLAYERS + 1 && !IsReplayBotControlled(bot, botClient[bot]))
 		{
-			playbackTickData[bot].Clear();
+			Tick_Free(bot);
 			botDataLoaded[bot] = false;
 			CancelReplayControlsForBot(bot);
 			ServerCommand("bot_kick %s", botName[bot]);
@@ -1365,8 +1702,8 @@ void PlaybackVersion2(int client, int bot, int &buttons, float vel[3], float ang
 		}
 		
 		// Load in the next tick
-		playbackTickData[bot].GetArray(playbackTick[bot], currentTickData);
-		playbackTickData[bot].GetArray(IntMax(playbackTick[bot] - 1, 0), prevTickData);
+		Tick_GetArray(bot, playbackTick[bot], currentTickData);
+		Tick_GetArray(bot, IntMax(playbackTick[bot] - 1, 0), prevTickData);
 		
 		// Check if the replay is paused
 		if (botPlaybackPaused[bot])
@@ -1555,13 +1892,13 @@ void PlaybackVersion2Post(int client, int bot)
 	{
 		return;
 	}
-	int size = playbackTickData[bot].Length;
+	int size = Tick_Length(bot);
 	if (playbackTick[bot] != 0 && playbackTick[bot] != (size - 1))
 	{
 		ReplayTickData currentTickData;
 		ReplayTickData prevTickData;
-		playbackTickData[bot].GetArray(playbackTick[bot], currentTickData);
-		playbackTickData[bot].GetArray(IntMax(playbackTick[bot] - 1, 0), prevTickData);
+		Tick_GetArray(bot, playbackTick[bot], currentTickData);
+		Tick_GetArray(bot, IntMax(playbackTick[bot] - 1, 0), prevTickData);
 
 		// TeleportEntity does not set the absolute origin and velocity so we need to do it
 		// to prevent inaccurate eye position interpolation.
@@ -1839,14 +2176,14 @@ static void PlaybackSkipToTick(int bot, int tick)
 	{
 		// Load in the next tick
 		ReplayTickData currentTickData;
-		playbackTickData[bot].GetArray(tick, currentTickData);
+		Tick_GetArray(bot, tick, currentTickData);
 
 		TeleportEntity(botClient[bot], currentTickData.origin, currentTickData.angles, view_as<float>( { 0.0, 0.0, 0.0 } ));
 
 		int direction = tick < playbackTick[bot] ? -1 : 1;
 		for (int i = playbackTick[bot]; i != tick; i += direction)
 		{
-			playbackTickData[bot].GetArray(i, currentTickData);
+			Tick_GetArray(bot, i, currentTickData);
 			if (currentTickData.flags & RP_TELEPORT_TICK)
 			{
 				botCurrentTeleport[bot] += direction;

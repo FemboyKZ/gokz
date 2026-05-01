@@ -160,6 +160,7 @@ enum struct ReplayWeaponEntry
 #define RP_DIRECTORY_RUNS "data/gokz-replays/_runs" // In Path_SM
 #define RP_DIRECTORY_CHEATERS "data/gokz-replays/_cheaters" // In Path_SM
 #define RP_DIRECTORY_JUMPS "data/gokz-replays/_jumps" // In Path_SM
+#define RP_DIRECTORY_TEMP "data/gokz-replays/_temp" // In Path_SM
 #define RP_DIRECTORY_BLOCKJUMPS "blocks"
 #define RP_FILE_EXTENSION "replay"
 #define RP_MAGIC_NUMBER 0x676F6B7A
@@ -178,6 +179,13 @@ enum struct ReplayWeaponEntry
 // Section payload codecs.
 #define RP_CODEC_RAW  0
 #define RP_CODEC_ZSTD 1
+
+// TICKS section keyframe interval. Every Nth tick is encoded as a full keyframe
+// (all delta flags set, prev tick treated as zero) and recorded in a trailing
+// index table { { u32 tickIndex; u32 fileOffset } x count; u32 count } appended
+// to the TICKS section payload (count is the LAST 4 bytes so the loader can
+// locate it without first decoding the tick stream).
+#define RP_TICKS_KEYFRAME_INTERVAL 640
 
 #define RP_MAX_BOTS 4
 #define RP_PLAYBACK_BREATHER_TIME 2.0
