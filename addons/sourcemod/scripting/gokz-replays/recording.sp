@@ -1163,7 +1163,8 @@ static void RemoveFromRunningTimers(int client, Handle timerToRemove)
 // =====[ WRITE CACHE ]=====
 //
 // Byte-addressable buffer that batches small file writes into one bulk write per ~64 KB to slash IFileSystem syscall count.
-// Each cell stores one byte (low 8 bits) so the buffer is flushed via file.Write(buf, n, 1).
+// Bytes are packed 4-per-cell little-endian so the buffer occupies 64 KB of data segment and the bulk flush emits the full cells via file.Write(buf, n, 4) 
+// Trailing 0-3 unaligned bytes are written individually.
 //
 // Usage:
 //   WriteCache_SetFile(file);
@@ -1172,9 +1173,12 @@ static void RemoveFromRunningTimers(int client, Handle timerToRemove)
 //
 // Autoflushes midwrite when full, so payloads larger than the buffer still work
 
+#define WRITE_CACHE_CELLS 16384
+#define WRITE_CACHE_BYTES (WRITE_CACHE_CELLS * 4)
+
 static File writeCacheFile;
-static int writeCacheNext;     // bytes used
-static int writeCache[65536];  // one byte per cell (low 8 bits) => 64 KB capacity
+static int writeCacheNext;                 // byte position in cache
+static int writeCache[WRITE_CACHE_CELLS];  // 4 bytes per cell, LE packed => 64 KB capacity
 
 static void WriteCache_SetFile(File file)
 {
@@ -1184,42 +1188,75 @@ static void WriteCache_SetFile(File file)
 
 static void WriteCache_Flush()
 {
-	if (writeCacheNext > 0)
+	if (writeCacheNext == 0)
 	{
-		writeCacheFile.Write(writeCache, writeCacheNext, 1);
-		writeCacheNext = 0;
+		return;
 	}
+
+	int fullCells = writeCacheNext >> 2;
+	int tailBytes = writeCacheNext & 3;
+
+	if (fullCells > 0)
+	{
+		writeCacheFile.Write(writeCache, fullCells, 4);
+	}
+	if (tailBytes > 0)
+	{
+		int tailCell = writeCache[fullCells];
+		for (int i = 0; i < tailBytes; i++)
+		{
+			writeCacheFile.WriteInt8((tailCell >> (i * 8)) & 0xFF);
+		}
+	}
+
+	writeCacheNext = 0;
 }
 
 static void WriteCache_WriteInt8(int v)
 {
-	if (writeCacheNext + 1 > sizeof(writeCache))
+	if (writeCacheNext + 1 > WRITE_CACHE_BYTES)
 	{
 		WriteCache_Flush();
 	}
-	writeCache[writeCacheNext++] = v & 0xFF;
+
+	int idx = writeCacheNext >> 2;
+	int shift = (writeCacheNext & 3) * 8;
+	if (shift == 0)
+	{
+		writeCache[idx] = v & 0xFF;
+	}
+	else
+	{
+		writeCache[idx] |= (v & 0xFF) << shift;
+	}
+	writeCacheNext++;
 }
 
 static void WriteCache_WriteInt16(int v)
 {
-	if (writeCacheNext + 2 > sizeof(writeCache))
-	{
-		WriteCache_Flush();
-	}
-	writeCache[writeCacheNext++] = v & 0xFF;
-	writeCache[writeCacheNext++] = (v >> 8) & 0xFF;
+	WriteCache_WriteInt8(v & 0xFF);
+	WriteCache_WriteInt8((v >> 8) & 0xFF);
 }
 
 static void WriteCache_WriteInt32(int v)
 {
-	if (writeCacheNext + 4 > sizeof(writeCache))
+	// Store the whole cell in one op. TICKS routes every write through WriteInt32 (via WriteCache_WriteData) starting from offset 0,
+	// so it stays on this path end-to-end.
+	if ((writeCacheNext & 3) == 0)
 	{
-		WriteCache_Flush();
+		if (writeCacheNext + 4 > WRITE_CACHE_BYTES)
+		{
+			WriteCache_Flush();
+		}
+		writeCache[writeCacheNext >> 2] = v;
+		writeCacheNext += 4;
+		return;
 	}
-	writeCache[writeCacheNext++] = v & 0xFF;
-	writeCache[writeCacheNext++] = (v >> 8) & 0xFF;
-	writeCache[writeCacheNext++] = (v >> 16) & 0xFF;
-	writeCache[writeCacheNext++] = (v >> 24) & 0xFF;
+
+	WriteCache_WriteInt8(v & 0xFF);
+	WriteCache_WriteInt8((v >> 8) & 0xFF);
+	WriteCache_WriteInt8((v >> 16) & 0xFF);
+	WriteCache_WriteInt8((v >> 24) & 0xFF);
 }
 
 static void WriteCache_WriteString(const char[] s, int byteCount)
