@@ -135,10 +135,24 @@ enum struct ReplayTickData
 #define RP_DIRECTORY_BLOCKJUMPS "blocks"
 #define RP_FILE_EXTENSION "replay"
 #define RP_MAGIC_NUMBER 0x676F6B7A
-#define RP_FORMAT_VERSION 0x02
+#define RP_FORMAT_VERSION 0x03
 #define RP_NAV_FILE "maps/gokz-replays.nav"
 #define RP_V1_TICK_DATA_BLOCKSIZE 7
 #define RP_CACHE_BLOCKSIZE 4
+
+// Section tags. Keep numeric values stable forever.
+#define RP_SECTION_END     0  // Terminator. No codec/length fields follow.
+#define RP_SECTION_TICKS   1  // Mandatory. Delta-encoded tick stream (v2 layout).
+#define RP_SECTION_EVENTS  2  // Timer/mode/style/teleport events.
+#define RP_SECTION_COURSE  3  // Course name + split/cpz/stage timings.
+#define RP_SECTION_WEAPONS 4  // Econ/skin/sticker info per weapon.
+#define RP_SECTION_CMDDATA 5  // Per tick anticheat metadata (latency, loss, etc).
+#define RP_SECTION_MD5     6  // Mode/style md5 verification table.
+
+// Section payload codecs.
+#define RP_CODEC_RAW  0
+#define RP_CODEC_ZSTD 1
+
 #define RP_MAX_BOTS 4
 #define RP_PLAYBACK_BREATHER_TIME 2.0
 #define RP_MIN_CHEATER_REPLAY_LENGTH 30 // 30 seconds

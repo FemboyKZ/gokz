@@ -123,7 +123,7 @@ void GetPlaybackState(int client, HUDInfo info)
 	{
 		info.Time = playbackTick[bot]  * GetTickInterval();
 	}
-	else if (botReplayVersion[bot] == 2)
+	else if (botReplayVersion[bot] >= 2)
 	{
 		if (playbackTick[bot] < preAndPostRunTickCount)
 		{
@@ -321,7 +321,7 @@ void OnPlayerRunCmd_Playback(int client, int &buttons, float vel[3], float angle
 		switch (botReplayVersion[bot])
 		{
 			case 1: PlaybackVersion1(client, bot, buttons);
-			case 2: PlaybackVersion2(client, bot, buttons, vel, angles);
+			case 2, 3: PlaybackVersion2(client, bot, buttons, vel, angles);
 		}
 		break;
 	}
@@ -336,7 +336,7 @@ void OnPlayerRunCmdPost_Playback(int client)
 		{
 			continue;
 		}
-		if (botReplayVersion[bot] == 2)
+		if (botReplayVersion[bot] >= 2)
 		{
 			PlaybackVersion2Post(client, bot);
 		}
@@ -395,7 +395,15 @@ static bool LoadPlayback(int client, int bot, char[] path)
 		case 2:
 		{
 			botReplayVersion[bot] = 2;
-			if (!LoadFormatVersion2Replay(file, client, bot))
+			if (!LoadFormatVersion2Or3Replay(file, client, bot, 2))
+			{
+				return false;
+			}
+		}
+		case 3:
+		{
+			botReplayVersion[bot] = 3;
+			if (!LoadFormatVersion2Or3Replay(file, client, bot, 3))
 			{
 				return false;
 			}
@@ -508,7 +516,7 @@ static bool LoadFormatVersion1Replay(File file, int bot)
 	return true;
 }
 
-static bool LoadFormatVersion2Replay(File file, int client, int bot)
+static bool LoadFormatVersion2Or3Replay(File file, int client, int bot, int formatVersion)
 {
 	int length;
 
@@ -690,11 +698,35 @@ static bool LoadFormatVersion2Replay(File file, int client, int bot)
 	
 	// Read tick data
 	preAndPostRunTickCount = RoundToZero(RP_PLAYBACK_BREATHER_TIME / GetTickInterval());
+
+	if (formatVersion >= 3)
+	{
+		if (!ReadV3SectionStream(file, bot, tickCount))
+		{
+			delete file;
+			return false;
+		}
+	}
+	else
+	{
+		ReadTickStreamV2Format(file, bot, tickCount);
+	}
+
+	playbackTick[bot] = 0;
+	botDataLoaded[bot] = true;
+	
+	delete file;
+
+	return true;
+}
+
+static void ReadTickStreamV2Format(File file, int bot, int tickCount)
+{
 	any tickData[RP_V2_TICK_DATA_BLOCKSIZE];
 	for (int i = 0; i < tickCount; i++)
 	{
 		file.ReadInt32(tickData[RPDELTA_DELTAFLAGS]);
-		
+
 		for (int index = 1; index < sizeof(tickData); index++)
 		{
 			int currentFlag = (1 << index);
@@ -707,20 +739,63 @@ static bool LoadFormatVersion2Replay(File file, int client, int bot)
 		// HACK: Jump replays don't record proper length sometimes. I don't know why.
 		//		 This leads to oversized replays full of 0s at the end.
 		// 		 So, we do this horrible check to dodge that issue.
-		if (tickData[RPDELTA_ORIGIN_X] == 0 && tickData[RPDELTA_ORIGIN_Y] == 0 && tickData[RPDELTA_ORIGIN_Z] == 0 
+		if (tickData[RPDELTA_ORIGIN_X] == 0 && tickData[RPDELTA_ORIGIN_Y] == 0 && tickData[RPDELTA_ORIGIN_Z] == 0
 			&& tickData[RPDELTA_ANGLES_X] == 0 && tickData[RPDELTA_ANGLES_Y] == 0)
 		{
 			break;
 		}
 		playbackTickData[bot].PushArray(tickData);
 	}
-	
-	playbackTick[bot] = 0;
-	botDataLoaded[bot] = true;
-	
-	delete file;
+}
 
-	return true;
+static bool ReadV3SectionStream(File file, int bot, int tickCount)
+{
+	for (;;)
+	{
+		int tag;
+		if (!file.ReadInt32(tag))
+		{
+			// EOF without an explicit terminator is tolerated.
+			return true;
+		}
+		if (tag == RP_SECTION_END)
+		{
+			return true;
+		}
+
+		int codec;
+		int length;
+		int uncompressedLength;
+		if (!file.ReadInt8(codec)
+			|| !file.ReadInt32(length)
+			|| !file.ReadInt32(uncompressedLength))
+		{
+			LogError("Truncated section header (tag %d).", tag);
+			return false;
+		}
+
+		int payloadStart = file.Position;
+
+		switch (tag)
+		{
+			case RP_SECTION_TICKS:
+			{
+				if (codec == RP_CODEC_RAW)
+				{
+					ReadTickStreamV2Format(file, bot, tickCount);
+				}
+				else
+				{
+					LogError("Unknown codec %d for TICKS section, skipping.", codec);
+				}
+			}
+			// Future tags fall through below.
+		}
+
+		// Always advance to end of payload to handle unknown tags, unknown codecs
+		// and the v2 tick reader's early-break HACK.
+		file.Seek(payloadStart + length, SEEK_SET);
+	}
 }
 
 static void PlaybackVersion1(int client, int bot, int &buttons)
@@ -1427,7 +1502,7 @@ static void PlaybackSkipToTick(int bot, int tick)
 		
 		TeleportEntity(botClient[bot], repOrigin, repAngles, view_as<float>( { 0.0, 0.0, 0.0 } ));
 	}
-	else if (botReplayVersion[bot] == 2)
+	else if (botReplayVersion[bot] >= 2)
 	{
 		// Load in the next tick
 		ReplayTickData currentTickData;

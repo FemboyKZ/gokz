@@ -479,7 +479,8 @@ static bool SaveRecordingOfRun(int client, int mode, int style, int course, floa
 	file.WriteInt8(runHeader.course);
 	file.WriteInt32(runHeader.teleportsUsed);
 
-	WriteTickData(file, client, ReplayType_Run);
+	WriteSectionTicks(file, client, ReplayType_Run);
+	WriteSectionEnd(file);
 
 	delete file;
 
@@ -515,7 +516,8 @@ static bool SaveRecordingOfCheater(int client, ACReason reason)
 
 	WriteGeneralHeader(file, generalHeader);
 	file.WriteInt8(view_as<int>(cheaterHeader.ACReason));
-	WriteTickData(file, client, ReplayType_Cheater);
+	WriteSectionTicks(file, client, ReplayType_Cheater);
+	WriteSectionEnd(file);
 
 	delete file;
 
@@ -568,7 +570,8 @@ static bool SaveRecordingOfJump(int client, int mode, int style, int jumptype, f
 
 	WriteGeneralHeader(file, generalHeader);
 	WriteJumpHeader(file, jumpHeader);
-	WriteTickData(file, client, ReplayType_Jump, airtimeTicks);
+	WriteSectionTicks(file, client, ReplayType_Jump, airtimeTicks);
+	WriteSectionEnd(file);
 
 	delete file;
 
@@ -645,6 +648,31 @@ static void WriteJumpHeader(File file, JumpReplayHeader jumpHeader)
 	file.WriteInt32(view_as<int>(jumpHeader.pre));
 	file.WriteInt32(view_as<int>(jumpHeader.max));
 	file.WriteInt32((jumpHeader.airtime));
+}
+
+static void WriteSectionTicks(File file, int client, int replayType, int airtime = 0)
+{
+	file.WriteInt32(RP_SECTION_TICKS);
+	file.WriteInt8(RP_CODEC_RAW);
+
+	int lenPos = file.Position;
+	file.WriteInt32(0); // length placeholder
+	file.WriteInt32(0); // uncompressedLength placeholder
+
+	int payloadStart = file.Position;
+	WriteTickData(file, client, replayType, airtime);
+	int payloadEnd = file.Position;
+
+	int len = payloadEnd - payloadStart;
+	file.Seek(lenPos, SEEK_SET);
+	file.WriteInt32(len);
+	file.WriteInt32(len); // uncompressedLength == length for raw codec
+	file.Seek(payloadEnd, SEEK_SET);
+}
+
+static void WriteSectionEnd(File file)
+{
+	file.WriteInt32(RP_SECTION_END);
 }
 
 static void WriteTickData(File file, int client, int replayType, int airtime = 0)
