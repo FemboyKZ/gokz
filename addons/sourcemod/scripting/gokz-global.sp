@@ -104,6 +104,8 @@ public void OnPluginStart()
 	CreateConVars();
 	CreateGlobalForwards();
 	RegisterCommands();
+
+	CreateTimer(GL_API_RECHECK_INTERVAL, RecheckAPIStatus, INVALID_HANDLE, TIMER_REPEAT);
 }
 
 public void OnAllPluginsLoaded()
@@ -319,7 +321,7 @@ public void GOKZ_OnRunInvalidated(int client)
 	gB_InValidRun[client] = false;
 }
 
-public void GOKZ_GL_OnNewTopTime(int client, int course, int mode, int timeType, int rank, int rankOverall, float runTime)
+public void GOKZ_GL_OnNewTopTime(int client, int course, int mode, int timeType, int rank, int rankOverall, float runTime, const char[] mapName)
 {
 	AnnounceNewTopTime(client, course, mode, timeType, rank, rankOverall);
 }
@@ -614,6 +616,12 @@ public void OnEnforcedConVarChanged(ConVar convar, const char[] oldValue, const 
 
 static void SetupAPI()
 {
+	if (!GlobalAPI_HasAPIKey())
+	{
+		gB_APIKeyCheck = false;
+		return;
+	}
+	
 	GlobalAPI_GetAuthStatus(GetAuthStatusCallback);
 	GlobalAPI_GetModes(GetModeInfoCallback);
 	GlobalAPI_GetMapByName(GetMapCallback, _, gC_CurrentMap);
@@ -627,11 +635,47 @@ static void SetupAPI()
 	}
 }
 
+Action RecheckAPIStatus(Handle timer)
+{
+	if (!GlobalAPI_IsInit() || !GlobalAPI_HasAPIKey())
+	{
+		gB_APIKeyCheck = false;
+		return Plugin_Continue;
+	}
+	
+	GlobalAPI_GetAuthStatus(GetAuthStatusCallback);
+	
+	bool anyModeMissing = false;
+	for (int i = 0; i < MODE_COUNT; i++)
+	{
+		if (!gB_ModeCheck[i])
+		{
+			anyModeMissing = true;
+			break;
+		}
+	}
+	if (anyModeMissing)
+	{
+		GlobalAPI_GetModes(GetModeInfoCallback);
+	}
+	
+	if (!MapCheck() && gC_CurrentMap[0] != '\0')
+	{
+		GlobalAPI_GetMapByName(GetMapCallback, _, gC_CurrentMap);
+	}
+	
+	return Plugin_Continue;
+}
+
 public int GetAuthStatusCallback(JSON_Object auth_json, GlobalAPIRequestData request)
 {
 	if (request.Failure)
 	{
-		LogError("Failed to check API key with Global API.");
+		if (gB_APIKeyCheck)
+		{
+			LogError("Failed to check API key with Global API. Global submissions disabled until connectivity is restored.");
+		}
+		gB_APIKeyCheck = false;
 		return 0;
 	}
 	
