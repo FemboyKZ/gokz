@@ -39,8 +39,8 @@ enum
 stock char gC_PistolNames[PISTOL_COUNT][] = 
 {
 	"",  // Disabled
-	"USP-S", 
-	"P2000", 
+	"USP-S",
+	"P2000",
 	"Glock-18", 
 	"Dual Berettas", 
 	"P250", 
@@ -69,8 +69,8 @@ stock char gC_PistolClassNames[PISTOL_COUNT][] =
 stock int gI_PistolTeams[PISTOL_COUNT] = 
 {
 	CS_TEAM_NONE,  // Disabled
-	CS_TEAM_CT,
 	CS_TEAM_CT, 
+	CS_TEAM_CT,
 	CS_TEAM_T, 
 	CS_TEAM_NONE, 
 	CS_TEAM_NONE, 

@@ -52,7 +52,7 @@ public int Native_GetHitPerf(Handle plugin, int numParams)
 	}
 
 	bool[] perfs = new bool[sampleSize];
-	SortByRecentBool(gB_BhopHitPerf[client], AC_MAX_BHOP_SAMPLES, perfs, sampleSize, gI_BhopIndex[client]);
+	SortByRecent(gB_BhopHitPerf[client], AC_MAX_BHOP_SAMPLES, perfs, sampleSize, gI_BhopIndex[client]);
 	SetNativeArray(2, perfs, sampleSize);
 	return sampleSize;
 }
@@ -171,31 +171,6 @@ public int Native_GetPostJumpInputs(Handle plugin, int numParams)
 	SortByRecent(gI_BhopPostJumpInputs[client], AC_MAX_BHOP_SAMPLES, postJumpInputs, sampleSize, gI_BhopIndex[client]);
 	SetNativeArray(2, postJumpInputs, sampleSize);
 	return sampleSize;
-}
-
-
-
-// =====[ HELPERS ]=====
-
-static void SortByRecentBool(const bool[] input, int inputSize, bool[] buffer, int bufferSize, int index)
-{
-	if (index < 0 || index >= inputSize)
-	{
-		// If index is invalid, just return empty buffer
-		return;
-	}
-	
-	int reorderedIndex = 0;
-	for (int i = index; reorderedIndex < bufferSize && i >= 0; i--)
-	{
-		buffer[reorderedIndex] = input[i];
-		reorderedIndex++;
-	}
-	for (int i = inputSize - 1; reorderedIndex < bufferSize && i > index; i--)
-	{
-		buffer[reorderedIndex] = input[i];
-		reorderedIndex++;
-	}
 }
 
 

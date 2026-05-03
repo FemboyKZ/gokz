@@ -168,8 +168,7 @@ public Action Hook_SayText2(UserMsg msg_id, Protobuf msg, const int[] players, i
 	}
 	
 	char msgName[24];
-	Protobuf pbmsg = msg;
-	pbmsg.ReadString("msg_name", msgName, sizeof(msgName));
+	msg.ReadString("msg_name", msgName, sizeof(msgName));
 	if (StrEqual(msgName, "#Cstrike_Name_Change"))
 	{
 		gB_HideNameChange = false;
@@ -191,6 +190,7 @@ public void OnClientPutInServer(int client)
 {
 	OnClientPutInServer_Playback(client);
 	OnClientPutInServer_Recording(client);
+	HookClientEvents(client);
 }
 
 public void OnClientAuthorized(int client, const char[] auth)
@@ -206,12 +206,18 @@ public void OnClientDisconnect(int client)
 
 public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon, int &subtype, int &cmdnum, int &tickcount, int &seed, int mouse[2])
 {
-	if (!IsFakeClient(client))
+	OnPlayerRunCmd_Recording(client);
+	if (IsFakeClient(client))
 	{
-		return Plugin_Continue;
+		OnPlayerRunCmd_Playback(client, buttons, vel, angles);
+		return Plugin_Changed;
 	}
-	OnPlayerRunCmd_Playback(client, buttons, vel, angles);
-	return Plugin_Changed;
+	return Plugin_Continue;
+}
+
+public void Hook_PlayerPostThinkPost(int client)
+{
+	Hook_PlayerPostThinkPost_Recording(client);
 }
 
 public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float vel[3], const float angles[3], int weapon, int subtype, int cmdnum, int tickcount, int seed, const int mouse[2])
@@ -307,6 +313,11 @@ static void HookEvents()
 		StoreToAddress(gA_BotDuckAddr + view_as<Address>(i), 0x90, NumberType_Int8);
 	}
 	delete gameData;
+}
+
+static void HookClientEvents(int client)
+{
+	SDKHook(client, SDKHook_PostThinkPost, Hook_PlayerPostThinkPost);
 }
 
 static void UpdateCurrentMap()

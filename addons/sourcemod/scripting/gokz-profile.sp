@@ -56,7 +56,7 @@ public void OnAllPluginsLoaded()
 {
 	gB_Localranks = LibraryExists("gokz-localranks");
 	gB_Chat = LibraryExists("gokz-chat");
-    gB_Global = LibraryExists("gokz-global");
+	gB_Global = LibraryExists("gokz-global");
 
 	for (int client = 1; client <= MaxClients; client++)
 	{
@@ -77,14 +77,14 @@ public void OnLibraryAdded(const char[] name)
 {
 	gB_Localranks = gB_Localranks || StrEqual(name, "gokz-localranks");
 	gB_Chat = gB_Chat || StrEqual(name, "gokz-chat");
-    gB_Global = gB_Global || StrEqual(name, "gokz-global");
+	gB_Global = gB_Global || StrEqual(name, "gokz-global");
 }
 
 public void OnLibraryRemoved(const char[] name)
 {
 	gB_Localranks = gB_Localranks && !StrEqual(name, "gokz-localranks");
 	gB_Chat = gB_Chat && !StrEqual(name, "gokz-chat");
-    gB_Global = gB_Global && !StrEqual(name, "gokz-global");
+	gB_Global = gB_Global && !StrEqual(name, "gokz-global");
 }
 
 
@@ -153,6 +153,15 @@ public void OnClientConnected(int client)
 	Profile_OnClientConnected(client);
 }
 
+public void OnClientCookiesCached(int client)
+{
+	if (IsValidClient(client) && !IsFakeClient(client))
+	{
+		int mode = GOKZ_GetCoreOption(client, Option_Mode);
+		UpdateRank(client, mode);
+	}
+}
+
 public void OnClientDisconnect(int client)
 {
 	Profile_OnClientDisconnect(client);
@@ -175,11 +184,6 @@ public void GOKZ_OnOptionChanged(int client, const char[] option, any newValue)
 
 public void GOKZ_GL_OnPointsUpdated(int client, int mode)
 {
-    if (!gB_Global)
-    {
-        return;
-    }
-
 	UpdateRank(client, mode);
 	Profile_OnPointsUpdated(client, mode);
 }
@@ -260,7 +264,7 @@ public void UpdateRank(int client, int mode)
 		return;
 	}
 
-    // If gokz-global is not loaded, just set basic tags without rank
+	// If gokz-global is not loaded, just set basic tags without rank
     if (!gB_Global)
     {
         UpdateTags(client, -1, mode);

@@ -133,6 +133,10 @@
 		"en"		"Miss"
 		"ru"		"Miss"
 	}
+	"Estimated Crouch Distance"
+	{
+		"en"		"ECD"
+	}
 
 
 	// =====[ CHAT MESSAGES ]=====
@@ -177,7 +181,7 @@
 	}
 
 
-	// =====[ CONSOLE MESSAGES ]===== 
+	// =====[ CONSOLE MESSAGES ]=====
 	"Console Jump Header"
 	{
 		// Bill jumped 268.3485 units with a Long Jump

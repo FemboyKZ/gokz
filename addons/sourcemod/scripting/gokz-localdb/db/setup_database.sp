@@ -14,7 +14,7 @@ void DB_SetupDatabase()
 	}
 
 	SQL_SetCharset(gH_DB, "utf8mb4");
-
+	
 	char databaseType[8];
 	SQL_ReadDriver(gH_DB, databaseType, sizeof(databaseType));
 	if (strcmp(databaseType, "sqlite", false) == 0)
