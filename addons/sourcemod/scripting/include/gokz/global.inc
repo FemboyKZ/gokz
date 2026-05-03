@@ -61,6 +61,8 @@ enum GlobalMode
 #define GL_FPS_MAX_KICK_TIMEOUT 10.0
 #define GL_FPS_MAX_MIN_VALUE 120
 #define GL_MYAW_MAX_VALUE 0.3
+#define GL_WARN_INTERVAL 30.0
+#define GL_API_RECHECK_INTERVAL 60.0
 
 stock char gC_EnforcedCVars[ENFORCEDCVAR_COUNT][] = 
 {
@@ -116,8 +118,9 @@ stock float gF_EnforcedCVarValues[ENFORCEDCVAR_COUNT] =
  * @param rank			Ranking within the same time type.
  * @param rankOverall	Overall (NUB and PRO) ranking (0 if not ranked high enough).
  * @param runTime		Player's end time.
+ * @param mapName		Name of the map the run was performed on. May differ from the current map, as this forward can be called after a map change.
  */
-forward void GOKZ_GL_OnNewTopTime(int client, int course, int mode, int timeType, int rank, int rankOverall, float runTime);
+forward void GOKZ_GL_OnNewTopTime(int client, int course, int mode, int timeType, int rank, int rankOverall, float runTime, const char[] mapName);
 
 
 
