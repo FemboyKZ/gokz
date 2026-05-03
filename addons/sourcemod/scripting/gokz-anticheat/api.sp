@@ -190,7 +190,7 @@ int GOKZ_AC_GetHitPerfV2(int client, bool[] perfs, int sampleSize)
 	{
 		return 0;
 	}
-	SortByRecentBool(gB_BhopHitPerfV2[client], AC_MAX_BHOP_SAMPLES, perfs, sampleSize, gI_BhopIndexV2[client]);
+	SortByRecent(gB_BhopHitPerfV2[client], AC_MAX_BHOP_SAMPLES, perfs, sampleSize, gI_BhopIndexV2[client]);
 	return sampleSize;
 }
 
