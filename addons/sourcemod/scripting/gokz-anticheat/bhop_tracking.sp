@@ -166,7 +166,9 @@ void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 		}
 	}
 	
-	if (JustLanded(client, cmdnum))
+	// Skip the land checks on perfect jumpbugs (land + jump same tick),
+	// otherwise the bind exception logic overwrites the recorded perf with -1.
+	if (JustLanded(client, cmdnum) && !JustJumped(client, cmdnum))
 	{
 		// These conditions exist to reduce false positives.
 		
