@@ -309,7 +309,7 @@ SELECT MAX(js.Distance), js.Mode, js.JumpType, js.Block \
 			WHERE \
 				IsBlockJump=1 AND \
 				SteamID32=%d \
-			GROUP BY \ 
+			GROUP BY \
 				Mode, JumpType \
 	) pb \
 	ON \
