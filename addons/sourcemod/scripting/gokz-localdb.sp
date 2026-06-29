@@ -8,6 +8,7 @@
 #undef REQUIRE_EXTENSIONS
 #undef REQUIRE_PLUGIN
 #include <gokz/jumpstats>
+#include <gokz/replays>
 
 #pragma newdecls required
 #pragma semicolon 1
@@ -43,6 +44,7 @@ int gI_RunCounter = 0;
 #include "gokz-localdb/db/cache_js.sp"
 #include "gokz-localdb/db/create_tables.sp"
 #include "gokz-localdb/db/save_js.sp"
+#include "gokz-localdb/db/jumpstat_replays.sp"
 #include "gokz-localdb/db/save_time.sp"
 #include "gokz-localdb/db/set_cheater.sp"
 #include "gokz-localdb/db/setup_client.sp"
@@ -68,6 +70,7 @@ public void OnPluginStart()
 	
 	CreateGlobalForwards();
 	RegisterCommands();
+	JSReplays_OnPluginStart();
 	DB_SetupDatabase();
 }
 
@@ -110,6 +113,7 @@ public void GOKZ_DB_OnMapSetup(int mapID)
 public void OnMapEnd()
 {
 	gB_MapSetUp = false;
+	JSReplays_OnMapEnd();
 }
 
 public void OnClientConnected(int client)
@@ -193,4 +197,5 @@ public void GOKZ_OnTimerEnd_Post(int client, int course, float time, int telepor
 public void GOKZ_JS_OnLanding(Jump jump)
 {
 	OnLanding_SaveJumpstat(jump);
+	JSReplays_OnLanding(jump);
 }

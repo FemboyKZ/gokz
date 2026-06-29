@@ -388,6 +388,69 @@ public Action SaveJump(Handle timer, DataPack data)
 	return Plugin_Stop;
 }
 
+bool StartJumpStatReplaySave(int client, const char[] guid, int mode, int style, int jumptype, float distance, int block, int strafes, float sync, float pre, float max, int airtime)
+{
+	if (!IsValidClient(client) || IsFakeClient(client) || GetSteamAccountID(client) == 0)
+	{
+		return false;
+	}
+
+	DataPack data = new DataPack();
+	data.WriteCell(GetClientUserId(client));
+	data.WriteString(guid);
+	data.WriteCell(mode);
+	data.WriteCell(style);
+	data.WriteCell(jumptype);
+	data.WriteFloat(distance);
+	data.WriteCell(block);
+	data.WriteCell(strafes);
+	data.WriteFloat(sync);
+	data.WriteFloat(pre);
+	data.WriteFloat(max);
+	data.WriteCell(airtime);
+
+	Handle timer = CreateTimer(RP_PLAYBACK_BREATHER_TIME, SaveJumpStat, data);
+	if (timer == INVALID_HANDLE)
+	{
+		delete data;
+		LogError("Could not create a timer so can't save jumpstat replay");
+		return false;
+	}
+	runningJumpstatTimers[client].Push(timer);
+	return true;
+}
+
+public Action SaveJumpStat(Handle timer, DataPack data)
+{
+	data.Reset();
+	int client = GetClientOfUserId(data.ReadCell());
+	char guid[64];
+	data.ReadString(guid, sizeof(guid));
+	int mode = data.ReadCell();
+	int style = data.ReadCell();
+	int jumptype = data.ReadCell();
+	float distance = data.ReadFloat();
+	int block = data.ReadCell();
+	int strafes = data.ReadCell();
+	float sync = data.ReadFloat();
+	float pre = data.ReadFloat();
+	float max = data.ReadFloat();
+	int airtime = data.ReadCell();
+	delete data;
+
+	if (!IsValidClient(client))
+	{
+		return Plugin_Stop;
+	}
+
+	RemoveFromRunningTimers(client, timer);
+
+	char replayPath[PLATFORM_MAX_PATH];
+	GOKZ_RP_FormatJumpStatReplayPath(replayPath, sizeof(replayPath), guid);
+	SaveRecordingOfJumpToPath(client, replayPath, mode, style, jumptype, distance, block, strafes, sync, pre, max, airtime);
+	return Plugin_Stop;
+}
+
 
 
 // =====[ PRIVATE ]=====
@@ -597,6 +660,43 @@ static bool SaveRecordingOfJump(int client, int mode, int style, int jumptype, f
 	{
 		LogError("Failed to create/open replay file to write to: \"%s\".", replayPath);
 		delete file;
+		return false;
+	}
+
+	WriteGeneralHeader(file, generalHeader);
+	WriteJumpHeader(file, jumpHeader);
+	WriteTickData(file, client, ReplayType_Jump, airtimeTicks);
+
+	delete file;
+
+	return true;
+}
+
+static bool SaveRecordingOfJumpToPath(int client, const char[] replayPath, int mode, int style, int jumptype, float distance, int block, int strafes, float sync, float pre, float max, int airtime)
+{
+	int airtimeTicks = RoundToNearest((float(airtime) / GOKZ_DB_JS_AIRTIME_PRECISION) * tickrate);
+	if (airtimeTicks + 2 * preAndPostRunTickCount >= maxCheaterReplayTicks)
+	{
+		LogError("WARNING: Invalid airtime (this is probably a bugged jump, please report it!).");
+		return false;
+	}
+
+	if (GetSteamAccountID(client) == 0)
+	{
+		LogError("Failed to save jumpstat replay, client is not authenticated.");
+		return false;
+	}
+
+	GeneralReplayHeader generalHeader;
+	FillGeneralHeader(generalHeader, client, ReplayType_Jump, mode, style, 2 * preAndPostRunTickCount + airtimeTicks);
+
+	JumpReplayHeader jumpHeader;
+	FillJumpHeader(jumpHeader, jumptype, distance, block, strafes, sync, pre, max, airtime);
+
+	File file = OpenFile(replayPath, "wb");
+	if (file == null)
+	{
+		LogError("Failed to create/open replay file to write to: \"%s\".", replayPath);
 		return false;
 	}
 
@@ -891,6 +991,10 @@ static void CreateReplaysDirectory()
 
 	// Create jumps parent replay directory
 	BuildPath(Path_SM, path, sizeof(path), "%s", RP_DIRECTORY_JUMPS);
+	CreateDirectory(path, 511);
+
+	// Create jumpstats (all valid jumps) replay directory
+	BuildPath(Path_SM, path, sizeof(path), "%s", RP_DIRECTORY_JUMPSTATS);
 	CreateDirectory(path, 511);
 }
 

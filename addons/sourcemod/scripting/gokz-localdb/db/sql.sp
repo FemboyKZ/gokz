@@ -323,6 +323,78 @@ SELECT MAX(js.Distance), js.Mode, js.JumpType, js.Block \
 
 
 
+// =====[ JUMPSTAT REPLAYS ]=====
+// Archive of every valid jumpstat replay. 
+// ReplayPath is relative to the gokz-replays data dir.
+
+char sqlite_jumpstatreplays_create[] = "\
+CREATE TABLE IF NOT EXISTS JumpstatReplays ( \
+    ReplayID INTEGER NOT NULL, \
+    SteamID32 INTEGER NOT NULL, \
+    JumpType INTEGER NOT NULL, \
+    Mode INTEGER NOT NULL, \
+    Distance INTEGER NOT NULL, \
+    IsBlockJump INTEGER NOT NULL, \
+    Block INTEGER NOT NULL, \
+    Strafes INTEGER NOT NULL, \
+    Sync INTEGER NOT NULL, \
+    Pre INTEGER NOT NULL, \
+    Max INTEGER NOT NULL, \
+    Airtime INTEGER NOT NULL, \
+    Created INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP, \
+    ReplayPath VARCHAR(255) NOT NULL, \
+    CONSTRAINT PK_JumpstatReplays PRIMARY KEY (ReplayID), \
+    CONSTRAINT FK_JumpstatReplays_SteamID32 FOREIGN KEY (SteamID32) REFERENCES Players(SteamID32) \
+    ON DELETE CASCADE)";
+
+char sqlite_jumpstatreplays_index[] = "\
+CREATE INDEX IF NOT EXISTS IX_JumpstatReplays_Group \
+    ON JumpstatReplays (SteamID32, JumpType, Mode, Distance)";
+
+char mysql_jumpstatreplays_create[] = "\
+CREATE TABLE IF NOT EXISTS JumpstatReplays ( \
+    ReplayID INTEGER UNSIGNED NOT NULL AUTO_INCREMENT, \
+    SteamID32 INTEGER UNSIGNED NOT NULL, \
+    JumpType TINYINT UNSIGNED NOT NULL, \
+    Mode TINYINT UNSIGNED NOT NULL, \
+    Distance INTEGER UNSIGNED NOT NULL, \
+    IsBlockJump TINYINT UNSIGNED NOT NULL, \
+    Block SMALLINT UNSIGNED NOT NULL, \
+    Strafes INTEGER UNSIGNED NOT NULL, \
+    Sync INTEGER UNSIGNED NOT NULL, \
+    Pre INTEGER UNSIGNED NOT NULL, \
+    Max INTEGER UNSIGNED NOT NULL, \
+    Airtime INTEGER UNSIGNED NOT NULL, \
+    Created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, \
+    ReplayPath VARCHAR(255) NOT NULL, \
+    CONSTRAINT PK_JumpstatReplays PRIMARY KEY (ReplayID), \
+    KEY IX_JumpstatReplays_Group (SteamID32, JumpType, Mode, Distance), \
+    CONSTRAINT FK_JumpstatReplays_SteamID32 FOREIGN KEY (SteamID32) REFERENCES Players(SteamID32) \
+    ON DELETE CASCADE)";
+
+char sql_jumpstatreplays_insert[] = "\
+INSERT INTO JumpstatReplays (SteamID32, JumpType, Mode, Distance, IsBlockJump, Block, Strafes, Sync, Pre, Max, Airtime, ReplayPath) \
+    VALUES (%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, '%s')";
+
+// Selects rows ranked beyond the keep-limit within their (player, mode, type) group,
+// lowest distance first, capped to a batch size. %d = keep limit,  %d = batch size.
+char sql_jumpstatreplays_cleanup_select[] = "\
+SELECT ReplayID, ReplayPath \
+    FROM JumpstatReplays jr \
+    WHERE ( \
+        SELECT COUNT(*) FROM JumpstatReplays jr2 \
+        WHERE jr2.SteamID32 = jr.SteamID32 AND jr2.JumpType = jr.JumpType AND jr2.Mode = jr.Mode \
+            AND (jr2.Distance > jr.Distance OR (jr2.Distance = jr.Distance AND jr2.ReplayID > jr.ReplayID)) \
+    ) >= %d \
+    ORDER BY Distance ASC \
+    LIMIT %d";
+
+// %s = comma-separated ReplayID list.
+char sql_jumpstatreplays_delete_ids[] = "\
+DELETE FROM JumpstatReplays WHERE ReplayID IN (%s)";
+
+
+
 // =====[ VB POSITIONS ]=====
 
 char sqlite_vbpos_create[] = "\

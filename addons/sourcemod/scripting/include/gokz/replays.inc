@@ -132,6 +132,7 @@ enum struct ReplayTickData
 #define RP_DIRECTORY_RUNS "data/gokz-replays/_runs" // In Path_SM
 #define RP_DIRECTORY_CHEATERS "data/gokz-replays/_cheaters" // In Path_SM
 #define RP_DIRECTORY_JUMPS "data/gokz-replays/_jumps" // In Path_SM
+#define RP_DIRECTORY_JUMPSTATS "data/gokz-replays/_jumpstats" // In Path_SM
 #define RP_DIRECTORY_BLOCKJUMPS "blocks"
 #define RP_FILE_EXTENSION "replay"
 #define RP_MAGIC_NUMBER 0x676F6B7A
@@ -202,6 +203,26 @@ native int GOKZ_RP_LoadJumpReplay(int client, char[] path);
  */
 native bool GOKZ_RP_UpdateReplayControlMenu(int client);
 
+/**
+ * Records the player's recent buffer as a standalone jumpstat replay,
+ * written to RP_DIRECTORY_JUMPSTATS/<guid>.replay after the post-jump breather.
+ *
+ * @param client			Client index.
+ * @param guid				Unique id used as the filename (no extension).
+ * @param mode				Mode index.
+ * @param style				Style index.
+ * @param jumpType			Jump type.
+ * @param distance			Jump distance.
+ * @param block				Block distance (0 if not a block jump).
+ * @param strafes			Strafe count.
+ * @param sync				Sync.
+ * @param pre				Prespeed.
+ * @param max				Max speed.
+ * @param airtime			Airtime (seconds * GOKZ_DB_JS_AIRTIME_PRECISION).
+ * @return					True if the save was scheduled.
+ */
+native bool GOKZ_RP_SaveJumpStatReplay(int client, const char[] guid, int mode, int style, int jumpType, float distance, int block, int strafes, float sync, float pre, float max, int airtime);
+
 
 
 // =====[ STOCKS ]=====
@@ -211,6 +232,15 @@ stock void GOKZ_RP_FormatRunReplayPath(char[] buffer, int maxlength, const char[
 	BuildPath(Path_SM, buffer, maxlength,
 		"%s/%s.%s",
 		RP_DIRECTORY_RUNS,
+		guid,
+		RP_FILE_EXTENSION);
+}
+
+stock void GOKZ_RP_FormatJumpStatReplayPath(char[] buffer, int maxlength, const char[] guid)
+{
+	BuildPath(Path_SM, buffer, maxlength,
+		"%s/%s.%s",
+		RP_DIRECTORY_JUMPSTATS,
 		guid,
 		RP_FILE_EXTENSION);
 }
@@ -236,5 +266,6 @@ public void __pl_gokz_replays_SetNTVOptional()
 	MarkNativeAsOptional("GOKZ_RP_GetPlaybackInfo");
 	MarkNativeAsOptional("GOKZ_RP_LoadJumpReplay");
 	MarkNativeAsOptional("GOKZ_RP_UpdateReplayControlMenu");
+	MarkNativeAsOptional("GOKZ_RP_SaveJumpStatReplay");
 }
 #endif
