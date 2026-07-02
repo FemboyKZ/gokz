@@ -11,6 +11,9 @@
 #define AC_TURN_EPSILON 0.001
 #define AC_FLIP_SEARCH 8
 #define AC_MIN_MOUSE_SAMPLES 8
+#define AC_IMPULSE_SPIKE 2.0
+#define AC_IMPULSE_SETTLE 1.0
+#define AC_SHARPNESS_FLOOR 0.5
 
 static const float AC_MODE_AIRACCELERATE[MODE_COUNT] = { 12.0, 100.0, 100.0 }; // (Vanilla, SimpleKZ, KZTimer).
 
@@ -260,8 +263,8 @@ static void AcComputeFlipLag(JumpTracker tracker, int firstTick, int lastTick)
 		strafeCount = JS_MAX_TRACKED_STRAFES - 1;
 	}
 
-	float lagSum, lagSqSum;
-	int matched, zeroLag;
+	float lagSum, lagSqSum, sharpnessSum;
+	int matched, zeroLag, impulses, accelSamples;
 
 	// Boundary tick of strafe k = first tick after the ticks of everything before it. Skip strafe 1.
 	int boundary = 1 + tracker.jump.strafes_ticks[0] + tracker.jump.strafes_ticks[1];
@@ -278,6 +281,21 @@ static void AcComputeFlipLag(JumpTracker tracker, int firstTick, int lastTick)
 		// Positive deltaYaw = turning left = expect a +moveleft press.
 		float dYaw = CalcDeltaAngle(acPose(start - 1).orientation[1], acPose(start).orientation[1]);
 		int key = dYaw > 0.0 ? IN_MOVELEFT : IN_MOVERIGHT;
+
+		// Yaw-accel shape at the flip: accel(t) = dYaw(t) - dYaw(t-1).
+		// AcYawAccel(start - 1) reaches back to pose start - 3.
+		if (start - 3 >= firstTick - 1 && start + 1 <= lastTick)
+		{
+			float aB = FloatAbs(AcYawAccel(jumper, start));
+			float aPrev = FloatAbs(AcYawAccel(jumper, start - 1));
+			float aNext = FloatAbs(AcYawAccel(jumper, start + 1));
+			accelSamples++;
+			sharpnessSum += aB / ((aPrev + aNext) / 2.0 + AC_SHARPNESS_FLOOR);
+			if (aB > AC_IMPULSE_SPIKE && aPrev < AC_IMPULSE_SETTLE && aNext < AC_IMPULSE_SETTLE)
+			{
+				impulses++;
+			}
+		}
 
 		int best = AC_FLIP_SEARCH + 1;
 		bool found = false;
@@ -318,4 +336,19 @@ static void AcComputeFlipLag(JumpTracker tracker, int firstTick, int lastTick)
 		tracker.jump.acFlipLagMean = mean;
 		tracker.jump.acFlipLagStd = SquareRoot(FloatMax(0.0, lagSqSum / float(matched) - mean * mean));
 	}
+
+	tracker.jump.acFlipImpulses = impulses;
+	tracker.jump.acFlipAccelSamples = accelSamples;
+	if (accelSamples > 0)
+	{
+		tracker.jump.acFlipSharpness = sharpnessSum / float(accelSamples);
+	}
+}
+
+// Signed yaw acceleration at tick t, deg/tick^2. Needs poses t-2 .. t.
+static float AcYawAccel(int jumper, int t)
+{
+	float dYawCur = CalcDeltaAngle(acPose(t - 1).orientation[1], acPose(t).orientation[1]);
+	float dYawPrev = CalcDeltaAngle(acPose(t - 2).orientation[1], acPose(t - 1).orientation[1]);
+	return dYawCur - dYawPrev;
 }

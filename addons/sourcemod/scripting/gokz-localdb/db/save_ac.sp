@@ -45,6 +45,8 @@ public void OnLanding_SaveAcStats(Jump jump)
 	bool hasLenStd = jump.strafes >= 3;
 	float lenStd = hasLenStd ? jump.acStrafeLenStd : 0.0;
 	bool hasPeak = jump.acTurnTicks > 0;
+	bool hasSharp = jump.acFlipAccelSamples > 0;
+	float sharp = hasSharp ? jump.acFlipSharpness : 0.0;
 
 	// Pooled flip-lag sums, rebuilt from the per-jump mean/std over the matched flips.
 	// Constant nonzero lag (macro with a fixed offset) shows as near-zero pooled variance even when the zero-lag count looks human.
@@ -60,13 +62,15 @@ public void OnLanding_SaveAcStats(Jump jump)
 		jump.acCeilingTicks, jump.acMouseTicks, jump.acInjectedTicks,
 		jump.acFlipMatched, jump.acFlipZeroLag,
 		hasK ? 1 : 0, hasLenStd ? 1 : 0, hasPeak ? 1 : 0,
+		jump.acFlipImpulses, jump.acFlipAccelSamples, hasSharp ? 1 : 0,
 		jump.acEffMean, jump.acEffMean * jump.acEffMean,
 		jump.acYawResidualRms, jump.acYawResidualRms * jump.acYawResidualRms,
 		kRes, kRes * kRes,
 		lenStd, lenStd * lenStd,
 		lagSum, lagSqSum,
 		hasPeak ? jump.acPeakDeltaYaw : 0.0,
-		hasPeak ? jump.acPeakDeltaYaw * jump.acPeakDeltaYaw : 0.0);
+		hasPeak ? jump.acPeakDeltaYaw * jump.acPeakDeltaYaw : 0.0,
+		sharp, sharp * sharp);
 
 	Transaction txn = SQL_CreateTransaction();
 	txn.AddQuery(query);

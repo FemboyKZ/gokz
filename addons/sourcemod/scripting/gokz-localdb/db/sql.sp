@@ -417,6 +417,9 @@ CREATE TABLE IF NOT EXISTS AnticheatStats ( \
     KJumps INTEGER NOT NULL, \
     LenStdJumps INTEGER NOT NULL, \
     PeakJumps INTEGER NOT NULL, \
+    FlipImpulses INTEGER NOT NULL, \
+    FlipAccelSamples INTEGER NOT NULL, \
+    SharpJumps INTEGER NOT NULL, \
     EffSum REAL NOT NULL, \
     EffSqSum REAL NOT NULL, \
     YawResSum REAL NOT NULL, \
@@ -429,6 +432,8 @@ CREATE TABLE IF NOT EXISTS AnticheatStats ( \
     FlipLagSqSum REAL NOT NULL, \
     PeakSum REAL NOT NULL, \
     PeakSqSum REAL NOT NULL, \
+    SharpSum REAL NOT NULL, \
+    SharpSqSum REAL NOT NULL, \
     Updated INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP, \
     CONSTRAINT PK_AnticheatStats PRIMARY KEY (SteamID32, Mode, JumpType), \
     CONSTRAINT FK_AnticheatStats_SteamID32 FOREIGN KEY (SteamID32) REFERENCES Players(SteamID32) \
@@ -451,6 +456,9 @@ CREATE TABLE IF NOT EXISTS AnticheatStats ( \
     KJumps INTEGER UNSIGNED NOT NULL, \
     LenStdJumps INTEGER UNSIGNED NOT NULL, \
     PeakJumps INTEGER UNSIGNED NOT NULL, \
+    FlipImpulses INTEGER UNSIGNED NOT NULL, \
+    FlipAccelSamples INTEGER UNSIGNED NOT NULL, \
+    SharpJumps INTEGER UNSIGNED NOT NULL, \
     EffSum DOUBLE NOT NULL, \
     EffSqSum DOUBLE NOT NULL, \
     YawResSum DOUBLE NOT NULL, \
@@ -463,6 +471,8 @@ CREATE TABLE IF NOT EXISTS AnticheatStats ( \
     FlipLagSqSum DOUBLE NOT NULL, \
     PeakSum DOUBLE NOT NULL, \
     PeakSqSum DOUBLE NOT NULL, \
+    SharpSum DOUBLE NOT NULL, \
+    SharpSqSum DOUBLE NOT NULL, \
     Updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, \
     CONSTRAINT PK_AnticheatStats PRIMARY KEY (SteamID32, Mode, JumpType), \
     CONSTRAINT FK_AnticheatStats_SteamID32 FOREIGN KEY (SteamID32) REFERENCES Players(SteamID32) \
@@ -471,9 +481,10 @@ CREATE TABLE IF NOT EXISTS AnticheatStats ( \
 char sqlite_acstats_upsert[] = "\
 INSERT INTO AnticheatStats (SteamID32, Mode, JumpType, Jumps, UsableTicks, TurnTicks, TurnBindTicks, \
         CeilingTicks, MouseTicks, InjectedTicks, FlipMatched, FlipZeroLag, KJumps, LenStdJumps, PeakJumps, \
+        FlipImpulses, FlipAccelSamples, SharpJumps, \
         EffSum, EffSqSum, YawResSum, YawResSqSum, KResSum, KResSqSum, LenStdSum, LenStdSqSum, \
-        FlipLagSum, FlipLagSqSum, PeakSum, PeakSqSum, Updated) \
-    VALUES (%d, %d, %d, 1, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, CURRENT_TIMESTAMP) \
+        FlipLagSum, FlipLagSqSum, PeakSum, PeakSqSum, SharpSum, SharpSqSum, Updated) \
+    VALUES (%d, %d, %d, 1, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, CURRENT_TIMESTAMP) \
     ON CONFLICT (SteamID32, Mode, JumpType) DO UPDATE SET \
         Jumps = Jumps + 1, \
         UsableTicks = UsableTicks + excluded.UsableTicks, \
@@ -487,6 +498,9 @@ INSERT INTO AnticheatStats (SteamID32, Mode, JumpType, Jumps, UsableTicks, TurnT
         KJumps = KJumps + excluded.KJumps, \
         LenStdJumps = LenStdJumps + excluded.LenStdJumps, \
         PeakJumps = PeakJumps + excluded.PeakJumps, \
+        FlipImpulses = FlipImpulses + excluded.FlipImpulses, \
+        FlipAccelSamples = FlipAccelSamples + excluded.FlipAccelSamples, \
+        SharpJumps = SharpJumps + excluded.SharpJumps, \
         EffSum = EffSum + excluded.EffSum, \
         EffSqSum = EffSqSum + excluded.EffSqSum, \
         YawResSum = YawResSum + excluded.YawResSum, \
@@ -499,14 +513,17 @@ INSERT INTO AnticheatStats (SteamID32, Mode, JumpType, Jumps, UsableTicks, TurnT
         FlipLagSqSum = FlipLagSqSum + excluded.FlipLagSqSum, \
         PeakSum = PeakSum + excluded.PeakSum, \
         PeakSqSum = PeakSqSum + excluded.PeakSqSum, \
+        SharpSum = SharpSum + excluded.SharpSum, \
+        SharpSqSum = SharpSqSum + excluded.SharpSqSum, \
         Updated = CURRENT_TIMESTAMP";
 
 char mysql_acstats_upsert[] = "\
 INSERT INTO AnticheatStats (SteamID32, Mode, JumpType, Jumps, UsableTicks, TurnTicks, TurnBindTicks, \
         CeilingTicks, MouseTicks, InjectedTicks, FlipMatched, FlipZeroLag, KJumps, LenStdJumps, PeakJumps, \
+        FlipImpulses, FlipAccelSamples, SharpJumps, \
         EffSum, EffSqSum, YawResSum, YawResSqSum, KResSum, KResSqSum, LenStdSum, LenStdSqSum, \
-        FlipLagSum, FlipLagSqSum, PeakSum, PeakSqSum) \
-    VALUES (%d, %d, %d, 1, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f) \
+        FlipLagSum, FlipLagSqSum, PeakSum, PeakSqSum, SharpSum, SharpSqSum) \
+    VALUES (%d, %d, %d, 1, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f) \
     ON DUPLICATE KEY UPDATE \
         Jumps = Jumps + 1, \
         UsableTicks = UsableTicks + VALUES(UsableTicks), \
@@ -520,6 +537,9 @@ INSERT INTO AnticheatStats (SteamID32, Mode, JumpType, Jumps, UsableTicks, TurnT
         KJumps = KJumps + VALUES(KJumps), \
         LenStdJumps = LenStdJumps + VALUES(LenStdJumps), \
         PeakJumps = PeakJumps + VALUES(PeakJumps), \
+        FlipImpulses = FlipImpulses + VALUES(FlipImpulses), \
+        FlipAccelSamples = FlipAccelSamples + VALUES(FlipAccelSamples), \
+        SharpJumps = SharpJumps + VALUES(SharpJumps), \
         EffSum = EffSum + VALUES(EffSum), \
         EffSqSum = EffSqSum + VALUES(EffSqSum), \
         YawResSum = YawResSum + VALUES(YawResSum), \
@@ -531,7 +551,9 @@ INSERT INTO AnticheatStats (SteamID32, Mode, JumpType, Jumps, UsableTicks, TurnT
         FlipLagSum = FlipLagSum + VALUES(FlipLagSum), \
         FlipLagSqSum = FlipLagSqSum + VALUES(FlipLagSqSum), \
         PeakSum = PeakSum + VALUES(PeakSum), \
-        PeakSqSum = PeakSqSum + VALUES(PeakSqSum)";
+        PeakSqSum = PeakSqSum + VALUES(PeakSqSum), \
+        SharpSum = SharpSum + VALUES(SharpSum), \
+        SharpSqSum = SharpSqSum + VALUES(SharpSqSum)";
 
 
 

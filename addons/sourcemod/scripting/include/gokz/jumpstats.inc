@@ -308,6 +308,9 @@ enum struct Jump
 	float acStrafeLenMean; // edge strafes excluded
 	float acStrafeLenStd;
 	float acPeakDeltaYaw; // deg/tick, turn binds excluded
+	float acFlipSharpness; // flip |accel| over neighbor |accel|, mean
+	int acFlipImpulses; // flips landing the whole turn in one tick
+	int acFlipAccelSamples; // flips with enough surrounding ticks
 	int acCeilingTicks; // turning ticks within 2% of the peak
 	int acTurnTicks; // turning ticks measured for the ceiling stats
 	int acTurnBindTicks; // ticks with +left/+right held
