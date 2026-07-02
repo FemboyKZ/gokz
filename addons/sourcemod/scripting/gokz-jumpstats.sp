@@ -35,6 +35,7 @@ bool gB_SpeedJustModifiedExternally[MAXPLAYERS + 1];
 #include "gokz-jumpstats/distance_tiers.sp"
 #include "gokz-jumpstats/jump_reporting.sp"
 #include "gokz-jumpstats/jump_tracking.sp"
+#include "gokz-jumpstats/anticheat_metrics.sp"
 #include "gokz-jumpstats/jump_validating.sp"
 #include "gokz-jumpstats/options.sp"
 #include "gokz-jumpstats/options_menu.sp"
@@ -92,7 +93,7 @@ public void OnClientPutInServer(int client)
 
 public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon, int &subtype, int &cmdnum, int &tickcount, int &seed, int mouse[2])
 {
-	OnPlayerRunCmd_JumpTracking(client, buttons, tickcount);
+	OnPlayerRunCmd_JumpTracking(client, buttons, tickcount, mouse);
 	return Plugin_Continue;
 }
 

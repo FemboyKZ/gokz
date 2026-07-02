@@ -16,6 +16,8 @@ enum struct Pose
 	int overlap;
 	int deadair;
 	int syncTicks;
+	int mouseX;
+	int buttons;
 }
 
 
@@ -35,6 +37,7 @@ static const float playerMins[3] =  { -16.0, -16.0, 0.0 };
 static const float playerMaxs[3] =  { 16.0, 16.0, 0.0 };
 static bool doFailstatAlways[MAXPLAYERS + 1];
 static bool isInAir[MAXPLAYERS + 1];
+static int currentMouseX[MAXPLAYERS + 1];
 static const Jump emptyJump;
 static Handle acceptInputHook;
 static ConVar cvGravity;
@@ -246,7 +249,10 @@ enum struct JumpTracker
 		{
 			this.EndAlwaysJumpstats();
 		}
-		
+
+		// Anti-cheat strafe features from the pose history
+		ComputeAcFeatures(this);
+
 		// Call the appropriate functions for either regular or always stats
 		this.Callback();
 	}
@@ -438,7 +444,9 @@ enum struct JumpTracker
 		Movement_GetProcessingVelocity(this.jumper, p.velocity);
 		Movement_GetEyeAngles(this.jumper, p.orientation);
 		p.speed = GetVectorHorizontalLength(p.velocity);
-		
+		p.mouseX = currentMouseX[this.jumper];
+		p.buttons = Movement_GetButtons(this.jumper);
+
 		// We use the current position in a lot of places, so we store it
 		// separately to avoid calling 'pose' all the time.
 		CopyVector(p.position, this.position);
@@ -1517,13 +1525,15 @@ void OnEndTouch_JumpTracking(int client, int touched)
 	}
 }
 
-void OnPlayerRunCmd_JumpTracking(int client, int buttons, int tickcount)
+void OnPlayerRunCmd_JumpTracking(int client, int buttons, int tickcount, const int mouse[2])
 {
 	if (!IsValidClient(client) || !IsPlayerAlive(client))
 	{
 		return;
 	}
-	
+
+	currentMouseX[client] = mouse[0];
+
 	jumpTrackers[client].tickCount = tickcount;
 	
 	if (GetClientButtons(client) & IN_JUMP)

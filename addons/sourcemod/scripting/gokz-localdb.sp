@@ -44,6 +44,7 @@ int gI_RunCounter = 0;
 #include "gokz-localdb/db/cache_js.sp"
 #include "gokz-localdb/db/create_tables.sp"
 #include "gokz-localdb/db/save_js.sp"
+#include "gokz-localdb/db/save_ac.sp"
 #include "gokz-localdb/db/jumpstat_replays.sp"
 #include "gokz-localdb/db/save_time.sp"
 #include "gokz-localdb/db/set_cheater.sp"
@@ -197,5 +198,11 @@ public void GOKZ_OnTimerEnd_Post(int client, int course, float time, int telepor
 public void GOKZ_JS_OnLanding(Jump jump)
 {
 	OnLanding_SaveJumpstat(jump);
+	OnLanding_SaveAcStats(jump);
 	JSReplays_OnLanding(jump);
+}
+
+public void GOKZ_JS_OnJumpstatAlways(Jump jump)
+{
+	OnLanding_SaveAcStats(jump);
 }

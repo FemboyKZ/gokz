@@ -296,6 +296,26 @@ enum struct Jump
 	float strafes_loss[JS_MAX_TRACKED_STRAFES];
 	float strafes_sync[JS_MAX_TRACKED_STRAFES];
 	float strafes_width[JS_MAX_TRACKED_STRAFES];
+
+	// Anti-cheat strafe features, filled by ComputeAcFeatures() at landing.
+	float acEffMean; // per-tick gain / optimal gain, averaged
+	float acEffStd;
+	float acYawResidualRms; // |deltaYaw| vs optimal turn rate, deg/tick
+	float acKFit; // yaw per mouse count, -1.0 when too little mouse data
+	float acKResidualRms; // -1.0 when too little mouse data
+	float acFlipLagMean; // key press vs turn flip offset, ticks
+	float acFlipLagStd;
+	float acStrafeLenMean; // edge strafes excluded
+	float acStrafeLenStd;
+	float acPeakDeltaYaw; // deg/tick, turn binds excluded
+	int acCeilingTicks; // turning ticks within 2% of the peak
+	int acTurnTicks; // turning ticks measured for the ceiling stats
+	int acTurnBindTicks; // ticks with +left/+right held
+	int acInjectedTicks; // turned with zero mouse input and no turn bind
+	int acMouseTicks; // ticks with nonzero mouse x
+	int acFlipMatched; // strafe flips with a matching key press found
+	int acFlipZeroLag; // matched flips where key and turn changed same tick
+	int acUsableTicks; // air ticks the features were computed over
 }
 
 
