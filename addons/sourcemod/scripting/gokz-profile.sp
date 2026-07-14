@@ -219,12 +219,12 @@ public void UpdateRank(int client, int mode)
             FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - VIP+", client);
             color = TAG_COLOR_VIP_PLUS;
         }
-        if (tagType == ProfileTagType_Contributor)
-        {
-            FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - Contributor", client);
-            FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - Contributor", client);
-            color = TAG_COLOR_CONTRIBUTOR;
-        }
+        if (tagType == ProfileTagType_VIPPlusPlus)
+		{
+			FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - VIP++", client);
+			FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - VIP++", client);
+			color = TAG_COLOR_VIP_PLUS_PLUS;
+		}
         if (tagType == ProfileTagType_Boa)
         {
             FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - Custom boa", client);
@@ -243,6 +243,12 @@ public void UpdateRank(int client, int mode)
             FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - Custom Cat", client);
             color = TAG_COLOR_CAT;
         }
+		if (tagType == ProfileTagType_Mal0Lover)
+		{
+			FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - Custom mal0 lover", client);
+			FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - Custom mal0 lover", client);
+			color = TAG_COLOR_MAL0_LOVER;
+		}
 
 		if (GOKZ_GetOption(client, gC_ProfileOptionNames[ProfileOption_ShowRankClanTag]) != ProfileOptionBool_Enabled)
 		{
@@ -330,18 +336,41 @@ void UpdateTags(int client, int rank, int mode)
 	}
 }
 
+bool InAdminGroup(int client, const char[] groupName)
+{
+	AdminId admin = GetUserAdmin(client);
+	if (admin == INVALID_ADMIN_ID)
+	{
+		return false;
+	}
+
+	int count = GetAdminGroupCount(admin);
+	char group[64];
+	for (int i = 0; i < count; i++)
+	{
+		GetAdminGroup(admin, i, group, sizeof(group));
+		if (StrEqual(group, groupName))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool CanUseTagType(int client, int tagType)
 {
 	switch (tagType)
 	{
 		case ProfileTagType_Rank: return true;
-		case ProfileTagType_VIP: return CheckCommandAccess(client, "gokz_flag_vip", ADMFLAG_CUSTOM1);
-        case ProfileTagType_VIPPlus: return CheckCommandAccess(client, "gokz_flag_vip_plus", ADMFLAG_CUSTOM2);
-        case ProfileTagType_Contributor: return CheckCommandAccess(client, "gokz_flag_contributor", ADMFLAG_CUSTOM3);
+		case ProfileTagType_VIP: return InAdminGroup(client, "VIP");
+		case ProfileTagType_VIPPlus: return InAdminGroup(client, "VIPPlus");
+		case ProfileTagType_VIPPlusPlus: return InAdminGroup(client, "VIPPlusPlus");
 		case ProfileTagType_Admin: return CheckCommandAccess(client, "gokz_flag_admin", ADMFLAG_GENERIC);
-        case ProfileTagType_Boa: return CheckCommandAccess(client, "gokz_flag_boa", ADMFLAG_CUSTOM4);
-        case ProfileTagType_Meower: return CheckCommandAccess(client, "gokz_flag_meower", ADMFLAG_CUSTOM5);
-        case ProfileTagType_Cat: return CheckCommandAccess(client, "gokz_flag_cat", ADMFLAG_CUSTOM6);
+		case ProfileTagType_Boa: return InAdminGroup(client, "boa");
+		case ProfileTagType_Meower: return InAdminGroup(client, "lexi");
+		case ProfileTagType_Cat: return InAdminGroup(client, "kri");
+		case ProfileTagType_Mal0Lover: return InAdminGroup(client, "coolcreater8");
 		default: return false;
 	}
 }

@@ -50,9 +50,9 @@
 	{
 		"en"		"VIP+"
 	}
-	"Options Menu - Tag Contributor"
+	"Options Menu - Tag VIP++"
 	{
-		"en"		"Contributor"
+		"en"		"VIP++"
 	}
 	"Options Menu - Tag Custom - boa"
 	{
@@ -65,6 +65,10 @@
 	"Options Menu - Tag Custom - cat"
 	{
 		"en"		"cat"
+	}
+	"Options Menu - Tag Custom - mal0 lover"
+	{
+		"en"		"mal0 lover"
 	}
 
 	//=====[ PROFILE ]=====
