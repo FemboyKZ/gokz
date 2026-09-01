@@ -242,6 +242,16 @@ native int GOKZ_RP_GetBotSlotFromClient(int client);
 native bool GOKZ_RP_SetBotIsAuto(int bot, bool isAuto);
 
 /**
+ * Kicks a replay bot and frees its slot.
+ * Use this rather than KickClient, which leaves bot_quota raised
+ * so the bot manager spawns an idle replacement.
+ *
+ * @param bot				Bot slot.
+ * @return					True if a bot was kicked.
+ */
+native bool GOKZ_RP_KickBot(int bot);
+
+/**
  * Freezes a replay bot on its current tick.
  *
  * @param bot				Bot slot.
@@ -359,6 +369,7 @@ public void __pl_gokz_replays_SetNTVOptional()
 	MarkNativeAsOptional("GOKZ_RP_GetClientFromBot");
 	MarkNativeAsOptional("GOKZ_RP_GetBotSlotFromClient");
 	MarkNativeAsOptional("GOKZ_RP_SetBotIsAuto");
+	MarkNativeAsOptional("GOKZ_RP_KickBot");
 	MarkNativeAsOptional("GOKZ_RP_Pause");
 	MarkNativeAsOptional("GOKZ_RP_Resume");
 	MarkNativeAsOptional("GOKZ_RP_SkipToTick");

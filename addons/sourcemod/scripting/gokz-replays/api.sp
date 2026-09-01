@@ -11,6 +11,7 @@ void CreateNatives()
 	CreateNative("GOKZ_RP_GetClientFromBot", Native_RP_GetClientFromBot);
 	CreateNative("GOKZ_RP_GetBotSlotFromClient", Native_RP_GetBotSlotFromClient);
 	CreateNative("GOKZ_RP_SetBotIsAuto", Native_RP_SetBotIsAuto);
+	CreateNative("GOKZ_RP_KickBot", Native_RP_KickBot);
 	CreateNative("GOKZ_RP_Pause", Native_RP_Pause);
 	CreateNative("GOKZ_RP_Resume", Native_RP_Resume);
 	CreateNative("GOKZ_RP_SkipToTick", Native_RP_SkipToTick);
@@ -60,6 +61,16 @@ public int Native_RP_SetBotIsAuto(Handle plugin, int numParams)
 	}
 	SetBotIsAuto(bot, GetNativeCell(2));
 	return true;
+}
+
+public int Native_RP_KickBot(Handle plugin, int numParams)
+{
+	int bot = GetNativeCell(1);
+	if (bot < 0 || bot >= RP_MAX_BOTS)
+	{
+		return false;
+	}
+	return KickReplayBot(bot);
 }
 
 public int Native_RP_Pause(Handle plugin, int numParams)
