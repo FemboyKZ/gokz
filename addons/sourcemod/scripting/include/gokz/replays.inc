@@ -176,6 +176,25 @@ enum struct ReplayTickData
 
 
 
+// =====[ FORWARDS ]=====
+
+/**
+ * Called after a run replay has been written to disk.
+ *
+ * @param client			Client index of the player who completed the run.
+ * @param replayType		Replay type (Run/Jump/Cheater).
+ * @param map				Map the run was completed on.
+ * @param course			Course the run was completed on.
+ * @param timeType			Time type (Pro/Nub).
+ * @param time				Run time.
+ * @param filePath			Replay file path.
+ * @param tempReplay		Always false here, present for compatibility with forks that store replays temporarily.
+ * @return					Ignored by gokz-replays.
+ */
+forward Action GOKZ_RP_OnReplaySaved(int client, int replayType, const char[] map, int course, int timeType, float time, const char[] filePath, bool tempReplay);
+
+
+
 // =====[ NATIVES ]====
 
 /**
@@ -192,9 +211,79 @@ native int GOKZ_RP_GetPlaybackInfo(int client, any[] info);
  *
  * @param client			Client index.
  * @param path				Path to the replay file.
- * @return					The client ID of the bot performing the replay.
+ * @param isAuto			Whether the bot loops its replay and is never auto-kicked.
+ * @return					Bot slot playing the replay, or -1 on failure.
  */
-native int GOKZ_RP_LoadJumpReplay(int client, char[] path);
+native int GOKZ_RP_LoadJumpReplay(int client, const char[] path, bool isAuto = false);
+
+/**
+ * Gets the client index of a replay bot.
+ *
+ * @param bot				Bot slot.
+ * @return					Client index, 0 until the bot has joined, or -1 if the slot is invalid.
+ */
+native int GOKZ_RP_GetClientFromBot(int bot);
+
+/**
+ * Gets the bot slot a client is replaying on.
+ *
+ * @param client			Client index.
+ * @return					Bot slot, or -1 if the client isn't a replay bot.
+ */
+native int GOKZ_RP_GetBotSlotFromClient(int client);
+
+/**
+ * Sets whether a bot loops its replay and survives having no spectators.
+ *
+ * @param bot				Bot slot.
+ * @param isAuto			Auto state.
+ * @return					True if the bot slot is valid.
+ */
+native bool GOKZ_RP_SetBotIsAuto(int bot, bool isAuto);
+
+/**
+ * Freezes a replay bot on its current tick.
+ *
+ * @param bot				Bot slot.
+ * @return					True if the bot slot is valid.
+ */
+native bool GOKZ_RP_Pause(int bot);
+
+/**
+ * Unfreezes a replay bot.
+ *
+ * @param bot				Bot slot.
+ * @return					True if the bot slot is valid.
+ */
+native bool GOKZ_RP_Resume(int bot);
+
+/**
+ * Jumps replay playback to a specific tick.
+ *
+ * @param bot				Bot slot.
+ * @param tick				Tick to move to.
+ * @return					True if the bot slot and tick are valid.
+ */
+native bool GOKZ_RP_SkipToTick(int bot, int tick);
+
+/**
+ * Gets the number of ticks in a bot's loaded replay.
+ *
+ * @param bot				Bot slot.
+ * @return					Tick count, or 0 if nothing is loaded.
+ */
+native int GOKZ_RP_GetTickCount(int bot);
+
+/**
+ * Reads one tick of a bot's loaded replay, indexed by the RPDELTA_* enum.
+ * Version 1 replays only fill in origin, angles and flags.
+ *
+ * @param bot				Bot slot.
+ * @param tick				Tick to read.
+ * @param output			Array to receive the tick data.
+ * @return					True if the tick was read.
+ */
+native bool GOKZ_RP_GetTickData(int bot, int tick, any output[RP_V2_TICK_DATA_BLOCKSIZE]);
 
 /**
  * Called by the HUD to show the replay control menu.
@@ -267,5 +356,13 @@ public void __pl_gokz_replays_SetNTVOptional()
 	MarkNativeAsOptional("GOKZ_RP_LoadJumpReplay");
 	MarkNativeAsOptional("GOKZ_RP_UpdateReplayControlMenu");
 	MarkNativeAsOptional("GOKZ_RP_SaveJumpStatReplay");
+	MarkNativeAsOptional("GOKZ_RP_GetClientFromBot");
+	MarkNativeAsOptional("GOKZ_RP_GetBotSlotFromClient");
+	MarkNativeAsOptional("GOKZ_RP_SetBotIsAuto");
+	MarkNativeAsOptional("GOKZ_RP_Pause");
+	MarkNativeAsOptional("GOKZ_RP_Resume");
+	MarkNativeAsOptional("GOKZ_RP_SkipToTick");
+	MarkNativeAsOptional("GOKZ_RP_GetTickCount");
+	MarkNativeAsOptional("GOKZ_RP_GetTickData");
 }
 #endif

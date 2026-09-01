@@ -101,6 +101,36 @@ void CreateNatives()
 	CreateNative("GOKZ_LR_GetRecordMissed", Native_GetRecordMissed);
 	CreateNative("GOKZ_LR_GetPBMissed", Native_GetPBMissed);
 	CreateNative("GOKZ_LR_ReopenMapTopMenu", Native_ReopenMapTopMenu);
+	CreateNative("GOKZ_LR_GetRecordReplayPath", Native_GetRecordReplayPath);
+}
+
+public int Native_GetRecordReplayPath(Handle plugin, int numParams)
+{
+	int course = GetNativeCell(1);
+	int mode = GetNativeCell(2);
+	int timeType = GetNativeCell(3);
+
+	if (course < 0 || course >= GOKZ_MAX_COURSES
+		|| mode < 0 || mode >= MODE_COUNT
+		|| timeType < 0 || timeType >= TIMETYPE_COUNT)
+	{
+		return false;
+	}
+
+	if (gC_RecordGUIDCache[course][mode][timeType][0] == '\0')
+	{
+		return false;
+	}
+
+	char path[PLATFORM_MAX_PATH];
+	GOKZ_RP_FormatRunReplayPath(path, sizeof(path), gC_RecordGUIDCache[course][mode][timeType]);
+	if (!FileExists(path))
+	{
+		return false;
+	}
+
+	SetNativeString(4, path, GetNativeCell(5));
+	return true;
 }
 
 public int Native_GetRecordMissed(Handle plugin, int numParams)

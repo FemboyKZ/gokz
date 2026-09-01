@@ -583,6 +583,9 @@ static bool SaveRecordingOfRun(int client, int mode, int style, int course, floa
 	LogMessage("Saved run replay '%s' (player: %d, map: %s, course: %d, time: %f, teleports: %d)",
 		guid, GetSteamAccountID(client), generalHeader.mapName, course, time, teleportsUsed);
 
+	Call_OnReplaySaved(client, ReplayType_Run, gC_CurrentMap, course,
+		GOKZ_GetTimeTypeEx(teleportsUsed), time, replayPath);
+
 	return true;
 }
 

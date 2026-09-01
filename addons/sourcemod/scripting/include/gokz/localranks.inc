@@ -151,6 +151,19 @@ native bool GOKZ_LR_GetPBMissed(int client, int timeType);
  */
 native void GOKZ_LR_ReopenMapTopMenu(int client);
 
+/**
+ * Gets the replay file path of the map's current record.
+ * Served from the cache refreshed on map setup and on every new record.
+ *
+ * @param course			Course number.
+ * @param mode				Mode index.
+ * @param timeType			Time type (Pro/Nub).
+ * @param buffer			Buffer to write the path into.
+ * @param maxlength			Size of the buffer.
+ * @return					True if a record replay exists on disk.
+ */
+native bool GOKZ_LR_GetRecordReplayPath(int course, int mode, int timeType, char[] buffer, int maxlength);
+
 
 
 // =====[ DEPENDENCY ]=====
@@ -172,5 +185,6 @@ public void __pl_gokz_localranks_SetNTVOptional()
 	MarkNativeAsOptional("GOKZ_LR_GetRecordMissed");
 	MarkNativeAsOptional("GOKZ_LR_GetPBMissed");
 	MarkNativeAsOptional("GOKZ_LR_ReopenMapTopMenu");
+	MarkNativeAsOptional("GOKZ_LR_GetRecordReplayPath");
 }
 #endif

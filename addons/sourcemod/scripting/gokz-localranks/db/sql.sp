@@ -132,6 +132,34 @@ SELECT MIN(Times.RunTime), MapCourses.Course, Times.Mode \
     WHERE Players.Cheater=0 AND MapCourses.MapID=%d AND Times.Teleports=0 \
     GROUP BY MapCourses.Course, Times.Mode";
 
+char sql_getwrguids[] = "\
+SELECT Records.Course, Records.Mode, Times.TimeGUID \
+    FROM Times \
+    INNER JOIN \
+    (SELECT MapCourses.Course AS Course, Times.Mode AS Mode, Times.MapCourseID AS MapCourseID, MIN(Times.RunTime) AS RecordTime \
+    FROM Times \
+    INNER JOIN MapCourses ON MapCourses.MapCourseID=Times.MapCourseID \
+    INNER JOIN Players ON Players.SteamID32=Times.SteamID32 \
+    WHERE Players.Cheater=0 AND MapCourses.MapID=%d \
+    GROUP BY MapCourses.Course, Times.Mode, Times.MapCourseID) Records \
+    ON Times.MapCourseID=Records.MapCourseID AND Times.Mode=Records.Mode AND Times.RunTime=Records.RecordTime \
+    INNER JOIN Players ON Players.SteamID32=Times.SteamID32 \
+    WHERE Players.Cheater=0 AND Times.TimeGUID IS NOT NULL AND Times.TimeGUID<>''";
+
+char sql_getwrguidspro[] = "\
+SELECT Records.Course, Records.Mode, Times.TimeGUID \
+    FROM Times \
+    INNER JOIN \
+    (SELECT MapCourses.Course AS Course, Times.Mode AS Mode, Times.MapCourseID AS MapCourseID, MIN(Times.RunTime) AS RecordTime \
+    FROM Times \
+    INNER JOIN MapCourses ON MapCourses.MapCourseID=Times.MapCourseID \
+    INNER JOIN Players ON Players.SteamID32=Times.SteamID32 \
+    WHERE Players.Cheater=0 AND MapCourses.MapID=%d AND Times.Teleports=0 \
+    GROUP BY MapCourses.Course, Times.Mode, Times.MapCourseID) Records \
+    ON Times.MapCourseID=Records.MapCourseID AND Times.Mode=Records.Mode AND Times.RunTime=Records.RecordTime AND Times.Teleports=0 \
+    INNER JOIN Players ON Players.SteamID32=Times.SteamID32 \
+    WHERE Players.Cheater=0 AND Times.TimeGUID IS NOT NULL AND Times.TimeGUID<>''";
+
 char sql_getpbs[] = "\
 SELECT MIN(Times.RunTime), MapCourses.Course, Times.Mode \
     FROM Times \

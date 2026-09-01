@@ -58,6 +58,7 @@ DynamicDetour gH_DHooks_TeamFull;
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
 	CreateNatives();
+	CreateGlobalForwards();
 	RegPluginLibrary("gokz-replays");
 	return APLRes_Success;
 }
