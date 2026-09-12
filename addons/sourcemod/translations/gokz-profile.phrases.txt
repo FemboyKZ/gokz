@@ -70,6 +70,10 @@
 	{
 		"en"		"mal0 lover"
 	}
+	"Options Menu - Tag Custom - isaac"
+	{
+		"en"		"method man"
+	}
 
 	//=====[ PROFILE ]=====
 	"Profile Menu - Title"
@@ -158,9 +162,9 @@
 	{
 		"en"		"VIP+"
 	}
-	"Tag - Contributor"
+	"Tag - VIP++"
 	{
-		"en"		"Contributor"
+		"en"		"VIP++"
 	}
 	"Tag - Custom boa"
 	{
@@ -173,5 +177,13 @@
 	"Tag - Custom Cat"
 	{
 		"en"		"cat"
+	}
+	"Tag - Custom mal0 lover"
+	{
+		"en"		"mal0 lover"
+	}
+	"Tag - Custom isaac"
+	{
+		"en"		"method man"
 	}
 }

@@ -18,7 +18,7 @@
 public Plugin myinfo = 
 {
 	name = "GOKZ Profile", 
-	author = "zealain, (FKZ mod)", 
+	author = "zealain", 
 	description = "Player profiles and ranks based on local and global data.", 
 	version = GOKZ_VERSION, 
 	url = GOKZ_SOURCE_URL
@@ -249,6 +249,12 @@ public void UpdateRank(int client, int mode)
 			FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - Custom mal0 lover", client);
 			color = TAG_COLOR_MAL0_LOVER;
 		}
+		if (tagType == ProfileTagType_Isaac)
+		{
+			FormatEx(clanTag, sizeof(clanTag), "[%s %T]", gC_ModeNamesShort[mode], "Tag - Custom isaac", client);
+			FormatEx(chatTag, sizeof(chatTag), "%T", "Tag - Custom isaac", client);
+			color = TAG_COLOR_ISAAC;
+		}
 
 		if (GOKZ_GetOption(client, gC_ProfileOptionNames[ProfileOption_ShowRankClanTag]) != ProfileOptionBool_Enabled)
 		{
@@ -371,6 +377,7 @@ bool CanUseTagType(int client, int tagType)
 		case ProfileTagType_Meower: return InAdminGroup(client, "lexi");
 		case ProfileTagType_Cat: return InAdminGroup(client, "kri");
 		case ProfileTagType_Mal0Lover: return InAdminGroup(client, "coolcreater8");
+		case ProfileTagType_Isaac: return InAdminGroup(client, "isaac");
 		default: return false;
 	}
 }
