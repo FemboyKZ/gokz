@@ -14,7 +14,7 @@
 public Plugin myinfo = 
 {
 	name = "GOKZ Pistol", 
-	author = "DanZay, (FKZ mod)", 
+	author = "DanZay", 
 	description = "Allows players to pick a pistol to KZ with", 
 	version = GOKZ_VERSION, 
 	url = GOKZ_SOURCE_URL
