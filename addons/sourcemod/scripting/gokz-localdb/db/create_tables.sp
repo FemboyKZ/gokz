@@ -20,6 +20,8 @@ void DB_CreateTables()
 			txn.AddQuery(sqlite_jumpstatreplays_create);
 			txn.AddQuery(sqlite_jumpstatreplays_index);
 			txn.AddQuery(sqlite_acstats_create);
+			txn.AddQuery(sqlite_playercvars_create);
+			txn.AddQuery(sqlite_playercvars_index);
 			txn.AddQuery(sqlite_vbpos_create);
 			txn.AddQuery(sqlite_startpos_create);
 		}
@@ -32,6 +34,7 @@ void DB_CreateTables()
 			txn.AddQuery(mysql_jumpstats_create);
 			txn.AddQuery(mysql_jumpstatreplays_create);
 			txn.AddQuery(mysql_acstats_create);
+			txn.AddQuery(mysql_playercvars_create);
 			txn.AddQuery(mysql_vbpos_create);
 			txn.AddQuery(mysql_startpos_create);
 		}

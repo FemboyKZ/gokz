@@ -313,9 +313,20 @@ enum struct Jump
 	int acFlipAccelSamples; // flips with enough surrounding ticks
 	int acCeilingTicks; // turning ticks within 2% of the peak
 	int acTurnTicks; // turning ticks measured for the ceiling stats
+	int acSpinTicks; // ticks turning faster than any strafe (snap/spin)
 	int acTurnBindTicks; // ticks with +left/+right held
 	int acInjectedTicks; // turned with zero mouse input and no turn bind
 	int acMouseTicks; // ticks with nonzero mouse x
+	int acYawlessMouseTicks; // mouse moved, view did not (+strafe / m_yaw 0)
+	float acKPitchFit; // pitch per mouse y count
+	int acPitchSamples; // ticks the pitch fit was made from
+	int acMouseYDeadTicks; // mouse x active, mouse y exactly 0
+	int acPitchFrozenTicks; // mouse y active, pitch unchanged (m_pitch ~0)
+	int acCmdGapTicks; // ticks with a non-consecutive usercmd number
+	int acSidemoveGhostTicks; // sidemove without an A/D button held
+	int acSidemoveNullTicks; // A/D held but zero sidemove (null bind/SOCD)
+	int acSidemoveMismatchTicks; // sidemove against the held key
+	int acRollTicks; // nonzero roll angle, never legit input
 	int acFlipMatched; // strafe flips with a matching key press found
 	int acFlipZeroLag; // matched flips where key and turn changed same tick
 	int acUsableTicks; // air ticks the features were computed over
@@ -360,6 +371,12 @@ forward void GOKZ_JS_OnFailstat(Jump jump);
  * @param jump			The jumpstats.
  */
 forward void GOKZ_JS_OnJumpstatAlways(Jump jump);
+
+/**
+ * Called when a mid-air jump is cut short by a teleport.
+ * @param jump			The jumpstats.
+ */
+forward void GOKZ_JS_OnJumpAborted(Jump jump);
 
 /**
  * Called when a player fails a jump and has always-on failstats enabled.

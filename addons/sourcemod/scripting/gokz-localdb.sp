@@ -45,6 +45,7 @@ int gI_RunCounter = 0;
 #include "gokz-localdb/db/create_tables.sp"
 #include "gokz-localdb/db/save_js.sp"
 #include "gokz-localdb/db/save_ac.sp"
+#include "gokz-localdb/db/player_cvars.sp"
 #include "gokz-localdb/db/jumpstat_replays.sp"
 #include "gokz-localdb/db/save_time.sp"
 #include "gokz-localdb/db/set_cheater.sp"
@@ -131,6 +132,8 @@ public void OnClientPostAdminCheck(int client)
 {
 	// We need this after OnClientPutInServer cause that's where the VBs get reset
 	gB_ClientPostAdminChecked[client] = true;
+
+	StartCvarTracking(client);
 	
 	if (gB_MapSetUp && GOKZ_GetOption(client, gC_DBOptionNames[DBOption_AutoLoadTimerSetup]) == DBOption_Enabled)
 	{
@@ -155,6 +158,7 @@ public void OnClientDisconnect(int client)
 {
 	gB_ClientSetUp[client] = false;
 	gB_ClientPostAdminChecked[client] = false;
+	StopCvarTracking(client);
 }
 
 public void GOKZ_OnCourseRegistered(int course)
@@ -205,4 +209,14 @@ public void GOKZ_JS_OnLanding(Jump jump)
 public void GOKZ_JS_OnJumpstatAlways(Jump jump)
 {
 	OnLanding_SaveAcStats(jump);
+}
+
+public void GOKZ_JS_OnTakeoff(int client, int jumpType)
+{
+	RequeryCvarsOnTakeoff(client);
+}
+
+public void GOKZ_JS_OnJumpAborted(Jump jump)
+{
+	OnJumpAborted_SaveAcStats(jump);
 }

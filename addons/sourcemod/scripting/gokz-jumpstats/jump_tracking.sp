@@ -17,7 +17,11 @@ enum struct Pose
 	int deadair;
 	int syncTicks;
 	int mouseX;
+	int mouseY;
 	int buttons;
+	int cmdGap; // 1 when usercmd number was not consecutive
+	float sidemove;
+	float lagged; // m_flLaggedMovementValue
 }
 
 
@@ -38,6 +42,10 @@ static const float playerMaxs[3] =  { 16.0, 16.0, 0.0 };
 static bool doFailstatAlways[MAXPLAYERS + 1];
 static bool isInAir[MAXPLAYERS + 1];
 static int currentMouseX[MAXPLAYERS + 1];
+static int currentMouseY[MAXPLAYERS + 1];
+static int currentCmdGap[MAXPLAYERS + 1];
+static int lastCmdnum[MAXPLAYERS + 1];
+static float currentSidemove[MAXPLAYERS + 1];
 static const Jump emptyJump;
 static Handle acceptInputHook;
 static ConVar cvGravity;
@@ -73,6 +81,7 @@ enum struct JumpTracker
 	int lastType;
 	int lastWPressedTick;
 	int nextCrouchRelease;
+	int preTeleportType; // jump type at the moment of a mid-air teleport
 	int syncTicks;
 	int lastCrouchPressedTick;
 	int tickCount;
@@ -93,6 +102,8 @@ enum struct JumpTracker
 		this.nextCrouchRelease = 100;
 		this.tickCount = 0;
 		this.hitHead = false;
+		// 0 is JumpType_LongJump
+		this.preTeleportType = JumpType_Invalid;
 	}
 	
 	
@@ -445,7 +456,11 @@ enum struct JumpTracker
 		Movement_GetEyeAngles(this.jumper, p.orientation);
 		p.speed = GetVectorHorizontalLength(p.velocity);
 		p.mouseX = currentMouseX[this.jumper];
+		p.mouseY = currentMouseY[this.jumper];
 		p.buttons = Movement_GetButtons(this.jumper);
+		p.cmdGap = currentCmdGap[this.jumper];
+		p.sidemove = currentSidemove[this.jumper];
+		p.lagged = GetEntPropFloat(this.jumper, Prop_Data, "m_flLaggedMovementValue");
 
 		// We use the current position in a lot of places, so we store it
 		// separately to avoid calling 'pose' all the time.
@@ -1525,7 +1540,7 @@ void OnEndTouch_JumpTracking(int client, int touched)
 	}
 }
 
-void OnPlayerRunCmd_JumpTracking(int client, int buttons, int tickcount, const int mouse[2])
+void OnPlayerRunCmd_JumpTracking(int client, int buttons, int tickcount, int cmdnum, const float vel[3], const int mouse[2])
 {
 	if (!IsValidClient(client) || !IsPlayerAlive(client))
 	{
@@ -1533,6 +1548,12 @@ void OnPlayerRunCmd_JumpTracking(int client, int buttons, int tickcount, const i
 	}
 
 	currentMouseX[client] = mouse[0];
+	currentMouseY[client] = mouse[1];
+	currentSidemove[client] = vel[1];
+
+	// Non-consecutive cmdnum = dropped or injected commands
+	currentCmdGap[client] = (cmdnum - lastCmdnum[client] != 1) ? 1 : 0;
+	lastCmdnum[client] = cmdnum;
 
 	jumpTrackers[client].tickCount = tickcount;
 	
@@ -1575,7 +1596,17 @@ public void Movement_OnPlayerMovePost_JumpTracking(int client)
 		doFailstatAlways[client] = false;
 		// Prevent TP shenanigans that would trigger failstats
 		//jumpTypeLast[client] = JumpType_Invalid;
-		
+
+		// AC stats for the aborted flight. Pose history still ends on the last pre-teleport tick.
+		if (isInAir[client] &&
+			jumpTrackers[client].preTeleportType != JumpType_Invalid &&
+			jumpTrackers[client].preTeleportType != JumpType_FullInvalid)
+		{
+			ComputeAcFeatures(jumpTrackers[client]);
+			Call_OnJumpAborted(jumpTrackers[client].jump);
+		}
+		jumpTrackers[client].preTeleportType = JumpType_Invalid;
+
 		if (GOKZ_JS_GetOption(client, JSOption_JumpstatsAlways) == JSToggleOption_Enabled &&
 			isInAir[client])
 		{
@@ -1747,7 +1778,14 @@ void OnTeleport_FailstatAlways(int client)
 {
 	// We want to synchronize all of that
 	doFailstatAlways[client] = true;
-	
+
+	// Capture type before invalidation. First teleport of the tick only,
+	// a second would read the already-invalidated type.
+	if (jumpTrackers[client].preTeleportType == JumpType_Invalid)
+	{
+		jumpTrackers[client].preTeleportType = jumpTrackers[client].jump.type;
+	}
+
 	// gokz-core does that too, but for some reason we have to do it again
 	InvalidateJumpstat(client);
 

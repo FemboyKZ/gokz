@@ -4,6 +4,7 @@ static GlobalForward H_OnFailstat;
 static GlobalForward H_OnJumpstatAlways;
 static GlobalForward H_OnFailstatAlways;
 static GlobalForward H_OnJumpInvalidated;
+static GlobalForward H_OnJumpAborted;
 
 
 
@@ -17,6 +18,7 @@ void CreateGlobalForwards()
 	H_OnJumpstatAlways = new GlobalForward("GOKZ_JS_OnJumpstatAlways", ET_Ignore, Param_Array);
 	H_OnFailstatAlways = new GlobalForward("GOKZ_JS_OnFailstatAlways", ET_Ignore, Param_Array);
 	H_OnJumpInvalidated = new GlobalForward("GOKZ_JS_OnJumpInvalidated", ET_Ignore, Param_Cell);
+	H_OnJumpAborted = new GlobalForward("GOKZ_JS_OnJumpAborted", ET_Ignore, Param_Array);
 }
 
 void Call_OnTakeoff(int client, int jumpType)
@@ -58,6 +60,13 @@ void Call_OnJumpstatAlways(Jump jump)
 void Call_OnFailstatAlways(Jump jump)
 {
 	Call_StartForward(H_OnFailstatAlways);
+	Call_PushArray(jump, sizeof(jump));
+	Call_Finish();
+}
+
+void Call_OnJumpAborted(Jump jump)
+{
+	Call_StartForward(H_OnJumpAborted);
 	Call_PushArray(jump, sizeof(jump));
 	Call_Finish();
 }

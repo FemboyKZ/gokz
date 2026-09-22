@@ -9,11 +9,19 @@
 #define AC_WISHSPEED 250.0
 
 #define AC_TURN_EPSILON 0.001
+#define AC_PITCH_EPSILON 0.001
 #define AC_FLIP_SEARCH 8
 #define AC_MIN_MOUSE_SAMPLES 8
 #define AC_IMPULSE_SPIKE 2.0
 #define AC_IMPULSE_SETTLE 1.0
 #define AC_SHARPNESS_FLOOR 0.5
+
+// Ceiling stats are meaningless without sustained real turning
+#define AC_MIN_CEILING_TURN_TICKS 16
+#define AC_MIN_CEILING_PEAK 1.0
+
+// Above this |deltaYaw| a tick is a spin/snap, not strafing
+#define AC_SPIN_THRESHOLD 30.0
 
 static const float AC_MODE_AIRACCELERATE[MODE_COUNT] = { 12.0, 100.0, 100.0 }; // (Vanilla, SimpleKZ, KZTimer).
 
@@ -64,6 +72,11 @@ void ComputeAcFeatures(JumpTracker tracker)
 
 	tracker.jump.acKFit = -1.0;
 	tracker.jump.acKResidualRms = -1.0;
+	// Tracker persists across jumps, so clear fields only written conditionally below.
+	// Yaw residual -1 = no turning ticks, save_ac keeps it out of the pooled mean.
+	tracker.jump.acEffMean = 0.0;
+	tracker.jump.acEffStd = 0.0;
+	tracker.jump.acYawResidualRms = -1.0;
 
 	// The ring holds the last 128 poses and every tick needs its predecessor.
 	// The last tick is the grounded landing tick, skip it (its gain includes ground friction).
@@ -80,7 +93,7 @@ void ComputeAcFeatures(JumpTracker tracker)
 	}
 
 	int mode = GOKZ_GetCoreOption(jumper, Option_Mode);
-	float accel = AC_MODE_AIRACCELERATE[mode] * AC_WISHSPEED * GetTickInterval();
+	float baseAccel = AC_MODE_AIRACCELERATE[mode] * AC_WISHSPEED * GetTickInterval();
 
 	float effSum, effSqSum;
 	int effTicks;
@@ -92,7 +105,12 @@ void ComputeAcFeatures(JumpTracker tracker)
 	int kSamples;
 	float turnMags[JS_FAILSTATS_MAX_TRACKED_TICKS];
 	int turnTicks;
-	int mouseTicks, injectedTicks, turnBindTicks;
+	int mouseTicks, injectedTicks, turnBindTicks, spinTicks, yawlessMouseTicks;
+	float pitchRatios[JS_FAILSTATS_MAX_TRACKED_TICKS];
+	int pitchSamples;
+	int mouseYDeadTicks, pitchFrozenTicks, cmdGapTicks;
+	int sidemoveGhostTicks, sidemoveNullTicks, sidemoveMismatchTicks, rollTicks;
+	int prevSideCond;
 
 	for (int t = firstTick; t <= lastTick; t++)
 	{
@@ -102,6 +120,10 @@ void ComputeAcFeatures(JumpTracker tracker)
 		float absDYaw = FloatAbs(dYaw);
 		int buttons = acPose(t).buttons;
 		bool turnBind = (buttons & (IN_LEFT | IN_RIGHT)) != 0;
+
+		// Lagged movement scales the accel budget, matching the replay side
+		float lagged = acPose(t).lagged > 0.0 ? acPose(t).lagged : 1.0;
+		float accel = baseAccel * lagged;
 
 		float maxGain, optDeltaYaw;
 		AcTickOptimal(prevSpeed, accel, maxGain, optDeltaYaw);
@@ -119,32 +141,108 @@ void ComputeAcFeatures(JumpTracker tracker)
 		}
 		if (absDYaw > AC_TURN_EPSILON)
 		{
-			float residual = absDYaw - optDeltaYaw;
-			yawResSqSum += residual * residual;
-			yawResTicks++;
-			if (!turnBind)
+			if (absDYaw > AC_SPIN_THRESHOLD)
 			{
-				turnMags[turnTicks++] = absDYaw;
+				spinTicks++;
+			}
+			else
+			{
+				float residual = absDYaw - optDeltaYaw;
+				yawResSqSum += residual * residual;
+				yawResTicks++;
+				if (!turnBind)
+				{
+					turnMags[turnTicks++] = absDYaw;
+				}
 			}
 		}
 
-		// Turn-bind ticks rotate the view without mouse input at a constant cl_yawspeed rate
+		// Turn-bind ticks (constant cl_yawspeed) and yaw-dead mouse ticks
+		// (+strafe / m_yaw 0) stay out of the k samples
 		int mouseX = acPose(t).mouseX;
 		if (mouseX != 0)
 		{
 			mouseTicks++;
 			if (!turnBind)
 			{
-				// Positive mouse x moves the view right = negative yaw
-				ratios[kSamples] = -dYaw / float(mouseX);
-				kMouse[kSamples] = float(mouseX);
-				kDYaw[kSamples] = dYaw;
-				kSamples++;
+				if (absDYaw <= AC_TURN_EPSILON)
+				{
+					yawlessMouseTicks++;
+				}
+				else
+				{
+					// Positive mouse x moves the view right = negative yaw
+					ratios[kSamples] = -dYaw / float(mouseX);
+					kMouse[kSamples] = float(mouseX);
+					kDYaw[kSamples] = dYaw;
+					kSamples++;
+				}
 			}
 		}
 		else if (absDYaw > 0.01 && !turnBind)
 		{
 			injectedTicks++;
+		}
+
+		float dPitch = CalcDeltaAngle(acPose(t - 1).orientation[0], acPose(t).orientation[0]);
+		int mouseY = acPose(t).mouseY;
+		if (mouseX != 0 && mouseY == 0)
+		{
+			mouseYDeadTicks++;
+		}
+		if (mouseY != 0)
+		{
+			if (FloatAbs(dPitch) <= AC_PITCH_EPSILON)
+			{
+				pitchFrozenTicks++;
+			}
+			else
+			{
+				pitchRatios[pitchSamples++] = dPitch / float(mouseY);
+			}
+		}
+
+		cmdGapTicks += acPose(t).cmdGap;
+
+		// Positive sidemove is +moveright.
+		// Key transitions skew sidemove vs buttons by one tick, so a condition must hold two ticks to count.
+		float side = acPose(t).sidemove;
+		bool moveLeft = (buttons & IN_MOVELEFT) != 0;
+		bool moveRight = (buttons & IN_MOVERIGHT) != 0;
+		int sideCond = 0;
+		if (FloatAbs(side) > 0.01 && !moveLeft && !moveRight)
+		{
+			sideCond = 1;
+		}
+		else if (FloatAbs(side) <= 0.01 && (moveLeft || moveRight))
+		{
+			sideCond = 2;
+		}
+		else if (side > 0.01 && moveLeft && !moveRight
+			 || side < -0.01 && moveRight && !moveLeft)
+		{
+			sideCond = 3;
+		}
+		if (sideCond != 0 && sideCond == prevSideCond)
+		{
+			if (sideCond == 1)
+			{
+				sidemoveGhostTicks++;
+			}
+			else if (sideCond == 2)
+			{
+				sidemoveNullTicks++;
+			}
+			else
+			{
+				sidemoveMismatchTicks++;
+			}
+		}
+		prevSideCond = sideCond;
+
+		if (FloatAbs(acPose(t).orientation[2]) > 0.001)
+		{
+			rollTicks++;
 		}
 	}
 
@@ -153,6 +251,30 @@ void ComputeAcFeatures(JumpTracker tracker)
 	tracker.jump.acTurnBindTicks = turnBindTicks;
 	tracker.jump.acMouseTicks = mouseTicks;
 	tracker.jump.acInjectedTicks = injectedTicks;
+	tracker.jump.acYawlessMouseTicks = yawlessMouseTicks;
+	tracker.jump.acMouseYDeadTicks = mouseYDeadTicks;
+	tracker.jump.acPitchFrozenTicks = pitchFrozenTicks;
+	tracker.jump.acCmdGapTicks = cmdGapTicks;
+	tracker.jump.acSidemoveGhostTicks = sidemoveGhostTicks;
+	tracker.jump.acSidemoveNullTicks = sidemoveNullTicks;
+	tracker.jump.acSidemoveMismatchTicks = sidemoveMismatchTicks;
+	tracker.jump.acRollTicks = rollTicks;
+
+	// Positive mouse y = positive pitch, no sign flip. Negative is legit (inverted m_pitch).
+	tracker.jump.acPitchSamples = pitchSamples;
+	tracker.jump.acKPitchFit = 0.0;
+	if (pitchSamples >= AC_MIN_MOUSE_SAMPLES)
+	{
+		SortFloats(pitchRatios, pitchSamples, Sort_Ascending);
+		if (pitchSamples % 2 == 1)
+		{
+			tracker.jump.acKPitchFit = pitchRatios[pitchSamples / 2];
+		}
+		else
+		{
+			tracker.jump.acKPitchFit = (pitchRatios[pitchSamples / 2 - 1] + pitchRatios[pitchSamples / 2]) / 2.0;
+		}
+	}
 
 	if (effTicks > 0)
 	{
@@ -188,7 +310,8 @@ void ComputeAcFeatures(JumpTracker tracker)
 		tracker.jump.acKResidualRms = SquareRoot(kResSqSum / float(kSamples));
 	}
 
-	// Yaw ceiling saturation over turning ticks, turn binds excluded
+	// Yaw ceiling saturation over turning ticks, turn binds excluded.
+	// Peak -1.0 = too little turning, save_ac skips the ceiling/peak columns.
 	float peak;
 	for (int i = 0; i < turnTicks; i++)
 	{
@@ -198,16 +321,24 @@ void ComputeAcFeatures(JumpTracker tracker)
 		}
 	}
 	int ceilingTicks;
-	for (int i = 0; i < turnTicks; i++)
+	if (turnTicks >= AC_MIN_CEILING_TURN_TICKS && peak >= AC_MIN_CEILING_PEAK)
 	{
-		if (turnMags[i] >= 0.98 * peak)
+		for (int i = 0; i < turnTicks; i++)
 		{
-			ceilingTicks++;
+			if (turnMags[i] >= 0.98 * peak)
+			{
+				ceilingTicks++;
+			}
 		}
+	}
+	else
+	{
+		peak = -1.0;
 	}
 	tracker.jump.acPeakDeltaYaw = peak;
 	tracker.jump.acTurnTicks = turnTicks;
 	tracker.jump.acCeilingTicks = ceilingTicks;
+	tracker.jump.acSpinTicks = spinTicks;
 
 	AcComputeStrafeStats(tracker);
 	AcComputeFlipLag(tracker, firstTick, lastTick);
