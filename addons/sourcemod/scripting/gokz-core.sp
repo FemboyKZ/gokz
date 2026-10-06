@@ -150,6 +150,7 @@ public void OnClientPutInServer(int client)
 	OnClientPutInServer_VirtualButtons(client);
 	OnClientPutInServer_Options(client);
 	OnClientPutInServer_MapTriggers(client);
+	OnClientPutInServer_MapZones(client);
 	OnClientPutInServer_Triggerfix(client);
 	OnClientPutInServer_Noclip(client);
 	OnClientPutInServer_Turnbinds(client);

@@ -7,10 +7,26 @@
 static Regex RE_BonusStartZone;
 static Regex RE_BonusEndZone;
 static bool touchedGroundSinceTouchingStartZone[MAXPLAYERS + 1];
+static int startZoneTouchCount[MAXPLAYERS + 1];
+
+
+
+// =====[ PUBLIC ]=====
+
+bool IsTouchingStartZone(int client)
+{
+	return startZoneTouchCount[client] > 0;
+}
 
 
 
 // =====[ EVENTS ]=====
+
+void OnClientPutInServer_MapZones(int client)
+{
+	// EndTouch may not reach us for a disconnecting client, so don't inherit their count.
+	startZoneTouchCount[client] = 0;
+}
 
 void OnPluginStart_MapZones()
 {
@@ -70,6 +86,7 @@ public void OnStartZoneStartTouch(const char[] name, int caller, int activator, 
 		return;
 	}
 
+	startZoneTouchCount[activator]++;
 	ProcessStartZoneStartTouch(activator, 0);
 }
 
@@ -80,6 +97,7 @@ public void OnStartZoneEndTouch(const char[] name, int caller, int activator, fl
 		return;
 	}
 
+	DecrementStartZoneTouchCount(activator);
 	ProcessStartZoneEndTouch(activator, 0);
 }
 
@@ -100,6 +118,7 @@ public void OnBonusStartZoneStartTouch(const char[] name, int caller, int activa
 		return;
 	}
 
+	startZoneTouchCount[activator]++;
 	int course = GetStartZoneBonusNumber(caller);
 	if (!GOKZ_IsValidCourse(course, true))
 	{
@@ -116,6 +135,7 @@ public void OnBonusStartZoneEndTouch(const char[] name, int caller, int activato
 		return;
 	}
 
+	DecrementStartZoneTouchCount(activator);
 	int course = GetStartZoneBonusNumber(caller);
 	if (!GOKZ_IsValidCourse(course, true))
 	{
@@ -144,6 +164,14 @@ public void OnBonusEndZoneStartTouch(const char[] name, int caller, int activato
 
 
 // =====[ PRIVATE ]=====
+
+static void DecrementStartZoneTouchCount(int client)
+{
+	if (startZoneTouchCount[client] > 0)
+	{
+		startZoneTouchCount[client]--;
+	}
+}
 
 static void ProcessStartZoneStartTouch(int client, int course)
 {

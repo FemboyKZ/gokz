@@ -511,7 +511,9 @@ void Hook_PlayerPostThink_Triggerfix(int client)
 	}
 	
 	// End touch fix
-	if (GetCheckUntouch(client))
+	// Only needed so start zone EndTouch (timer start) isn't delayed to the end of the frame.
+	// Forcing it everywhere re-fires StartTouch on triggers the hull briefly leaves, e.g. boosters when ducking.
+	if (IsTouchingStartZone(client) && GetCheckUntouch(client))
 	{
 		SDKCall(physicsCheckForEntityUntouch, client);
 	}
