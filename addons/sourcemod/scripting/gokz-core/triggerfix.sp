@@ -7,7 +7,6 @@
 // Engine constants, NOT settings (do not change)
 #define LAND_HEIGHT 2.0 					// Maximum height above ground at which you can "land"
 #define MIN_STANDABLE_ZNRM 0.7				// Minimum surface normal Z component of a walkable surface
-#define EFL_CHECK_UNTOUCH 1<<24
 
 static int processMovementTicks[MAXPLAYERS+1];
 static float playerFrameTime[MAXPLAYERS+1];
@@ -22,7 +21,6 @@ static float jumpBugOrigin[MAXPLAYERS + 1][3];
 
 static ConVar cvGravity;
 
-static Handle physicsCheckForEntityUntouch;
 static Handle acceptInputHookPre;
 static Handle processMovementHookPre;
 static Address serverGameEnts;
@@ -45,15 +43,6 @@ public void OnPluginStart_Triggerfix()
 		SetFailState("Failed to load gokz-core gamedata");
 	}
 	
-	// EndTouch Fix
-	// Thanks rumour and mev
-	StartPrepSDKCall(SDKCall_Entity);
-	if(!PrepSDKCall_SetFromConf(gamedataConf, SDKConf_Signature, "PhysicsCheckForEntityUntouch"))
-	{
-		SetFailState("Failed to get PhysicsCheckForEntityUntouch");
-	}
-
-	physicsCheckForEntityUntouch = EndPrepSDKCall();
 	// PassesTriggerFilters
 	StartPrepSDKCall(SDKCall_Entity);
 	if (!PrepSDKCall_SetFromConf(gamedataConf, SDKConf_Virtual, "CBaseTrigger::PassesTriggerFilters"))
@@ -509,14 +498,6 @@ void Hook_PlayerPostThink_Triggerfix(int client)
 			}
 		}
 	}
-	
-	// End touch fix
-	// Only needed so start zone EndTouch (timer start) isn't delayed to the end of the frame.
-	// Forcing it everywhere re-fires StartTouch on triggers the hull briefly leaves, e.g. boosters when ducking.
-	if (IsTouchingStartZone(client) && GetCheckUntouch(client))
-	{
-		SDKCall(physicsCheckForEntityUntouch, client);
-	}
 }
 
 static bool PlayerFilter(int entity, int mask)
@@ -639,10 +620,4 @@ static bool TracePlayerBBoxForGround(const float origin[3], const float originBe
 	}
 
 	return false;
-}
-
-static bool GetCheckUntouch(int client)
-{
-	int flags = GetEntProp(client, Prop_Data, "m_iEFlags");
-	return (flags & EFL_CHECK_UNTOUCH) != 0;
 }
