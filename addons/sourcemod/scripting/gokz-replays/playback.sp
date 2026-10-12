@@ -399,7 +399,7 @@ void TrySkipToTime(int client, int seconds)
 	int tick = seconds * 128 + preAndPostRunTickCount;
 	int bot = GetBotFromClient(GetObserverTarget(client));
 	
-	if (tick >= 0 && tick < playbackTickData[bot].Length)
+	if (bot != -1 && tick >= 0 && tick < playbackTickData[bot].Length)
 	{
 		PlaybackSkipToTick(bot, tick);
 	}
