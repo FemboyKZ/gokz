@@ -18,7 +18,7 @@ void JSReplays_OnPluginStart()
 		_, true, 1.0);
 	gCV_JSReplays_CleanupBatch = CreateConVar("gokz_js_replays_cleanup_batch", "500",
 		"Max jumpstat replays pruned per map end (keeps cleanup non-blocking). 0 disables cleanup.",
-		_, true, 0.0);
+		_, true, 0.0, true, 500.0); // Upper bound keeps the ReplayID list within its buffer
 	AutoExecConfig(true, "gokz-localdb");
 }
 
