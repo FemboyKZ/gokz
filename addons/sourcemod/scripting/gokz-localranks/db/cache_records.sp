@@ -5,7 +5,7 @@
 
 
 // A map with a malformed course number would otherwise write past the caches
-static bool ValidRecordCacheIndex(int course, int mode)
+bool ValidRecordCacheIndex(int course, int mode)
 {
 	return course >= 0 && course < GOKZ_MAX_COURSES && mode >= 0 && mode < MODE_COUNT;
 }
