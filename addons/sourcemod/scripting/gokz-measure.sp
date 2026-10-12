@@ -55,6 +55,15 @@ public void OnPluginStart()
 
 
 
+// =====[ CLIENT EVENTS ]=====
+
+public void OnClientPutInServer(int client)
+{
+	gB_MeasureDetailed[client] = false;
+}
+
+
+
 // =====[ OTHER EVENTS ]=====
 
 public void OnMapStart()
