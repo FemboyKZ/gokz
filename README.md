@@ -12,13 +12,11 @@ GOKZ is a package of [SourceMod](https://www.sourcemod.net/about.php) plugins fo
 * Fix headhitter jumpstats registering (ported from cs2kz).
 * Make gokz-global module optional for gokz-profile functionality.
 * Added FKZ Specific VIP Role tags to gokz-profile.
-* Experimental anti-cheat for auto-jumpbug.
 * Optional detailed output for gokz-measure commands.
 
 ### Modified plugins
 
 ```txt
-gokz-anticheat
 gokz-jumpbeam
 gokz-jumpstats
 gokz-localdb
