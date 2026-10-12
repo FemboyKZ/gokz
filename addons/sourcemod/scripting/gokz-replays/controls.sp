@@ -49,13 +49,14 @@ bool UpdateReplayControlMenu(int client)
 	}
 	
 	if (showReplayControls[client] &&	
-		GOKZ_HUD_GetOption(client, HUDOption_ShowControls) == ReplayControls_Enabled)
+		(!gB_GOKZHUD || GOKZ_HUD_GetOption(client, HUDOption_ShowControls) == ReplayControls_Enabled))
 	{
+		bool hudMenuShowing = gB_GOKZHUD && GOKZ_HUD_GetMenuShowing(client);
 		// We have to update this often if bot uses teleports.
 		if (GetClientMenu(client) == MenuSource_None || 
-			GOKZ_HUD_GetMenuShowing(client) && GetClientAvgLoss(client, NetFlow_Both) > EPSILON || 
-			GOKZ_HUD_GetMenuShowing(client) && GOKZ_HUD_GetOption(client, HUDOption_TimerText) == TimerText_TPMenu ||
-			GOKZ_HUD_GetMenuShowing(client) && PlaybackGetTeleports(bot) > 0)
+			hudMenuShowing && GetClientAvgLoss(client, NetFlow_Both) > EPSILON || 
+			hudMenuShowing && GOKZ_HUD_GetOption(client, HUDOption_TimerText) == TimerText_TPMenu ||
+			hudMenuShowing && PlaybackGetTeleports(bot) > 0)
 		{
 			botTeleports[bot] = PlaybackGetTeleports(bot);
 			ShowReplayControlMenu(client, bot);
@@ -192,11 +193,17 @@ int MenuHandler_ReplayControls(Menu menu, MenuAction action, int param1, int par
 			{
 				SetEntProp(param1, Prop_Send, "m_iObserverMode", 6);
 			}
-			GOKZ_HUD_SetMenuShowing(param1, false);
+			if (gB_GOKZHUD)
+			{
+				GOKZ_HUD_SetMenuShowing(param1, false);
+			}
 		}
 		case MenuAction_Cancel:
 		{
-			GOKZ_HUD_SetMenuShowing(param1, false);
+			if (gB_GOKZHUD)
+			{
+				GOKZ_HUD_SetMenuShowing(param1, false);
+			}
 			if (param2 == MenuCancel_Exit)
 			{
 				CancelReplayControls(param1);
