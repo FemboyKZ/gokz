@@ -40,9 +40,13 @@ void DB_CreateTables()
 		}
 	}
 
-	txn.AddQuery(sql_times_alter_add_guid);
-	
+	SQL_ExecuteTransaction(gH_DB, txn, _, DB_TxnFailure_Generic, _, DBPrio_High);
+
+	// Separate transaction, as on SQLite a failure would also roll back the creates above.
+	Transaction alterTxn = SQL_CreateTransaction();
+	alterTxn.AddQuery(sql_times_alter_add_guid);
+
 	// No error logs for this transaction as it will always throw an error
 	// if the column already exists, which is more annoying than helpful.
-	SQL_ExecuteTransaction(gH_DB, txn, _, _, _, DBPrio_High);
+	SQL_ExecuteTransaction(gH_DB, alterTxn, _, _, _, DBPrio_High);
 } 
