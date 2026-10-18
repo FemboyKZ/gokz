@@ -46,6 +46,34 @@
 		"en"		"VIP"
 		"chi"		"会员"
 	}
+	"Options Menu - Tag VIP+"
+	{
+		"en"		"VIP+"
+	}
+	"Options Menu - Tag VIP++"
+	{
+		"en"		"VIP++"
+	}
+	"Options Menu - Tag Custom - boa"
+	{
+		"en"		"boa"
+	}
+	"Options Menu - Tag Custom - Meower"
+	{
+		"en"		"Meower"
+	}
+	"Options Menu - Tag Custom - cat"
+	{
+		"en"		"cat"
+	}
+	"Options Menu - Tag Custom - mal0 lover"
+	{
+		"en"		"mal0 lover"
+	}
+	"Options Menu - Tag Custom - isaac"
+	{
+		"en"		"method man"
+	}
 
 	//=====[ PROFILE ]=====
 	"Profile Menu - Title"
@@ -129,5 +157,33 @@
 	{
 		"en"		"VIP"
 		"chi"		"会员"
+	}
+	"Tag - VIP+"
+	{
+		"en"		"VIP+"
+	}
+	"Tag - VIP++"
+	{
+		"en"		"VIP++"
+	}
+	"Tag - Custom boa"
+	{
+		"en"		"boa"
+	}
+	"Tag - Custom Meower"
+	{
+		"en"		"Meower"
+	}
+	"Tag - Custom Cat"
+	{
+		"en"		"cat"
+	}
+	"Tag - Custom mal0 lover"
+	{
+		"en"		"mal0 lover"
+	}
+	"Tag - Custom isaac"
+	{
+		"en"		"method man"
 	}
 }

@@ -186,6 +186,13 @@ enum
 	ProfileTagType_Rank = 0,
 	ProfileTagType_Admin,
 	ProfileTagType_VIP,
+	ProfileTagType_VIPPlus,
+	ProfileTagType_VIPPlusPlus,
+	ProfileTagType_Boa,
+	ProfileTagType_Meower,
+	ProfileTagType_Cat,
+	ProfileTagType_Mal0Lover,
+	ProfileTagType_Isaac,
 	PROFILETAGTYPE_COUNT
 };
 
@@ -204,7 +211,7 @@ stock char gC_ProfileOptionDescriptions[PROFILEOPTION_COUNT][] =
 {
 	"Show Rank Tag in Chat - 0 = Disabled, 1 = Enabled",
 	"Show Rank in Clan - 0 = Disabled, 1 = Enabled",
-	"Type of Tag to Show - 0 = Rank, 1 = Admin, 2 = VIP"
+	"Type of Tag to Show - 0 = Rank, 1 = Admin, 2 = VIP, 3 = VIP+, 4 = VIP++, 5-9 = Custom"
 };
 
 stock char gC_ProfileOptionPhrases[PROFILEOPTION_COUNT][] = 
@@ -224,7 +231,14 @@ stock char gC_ProfileTagTypePhrases[PROFILETAGTYPE_COUNT][] =
 {
 	"Options Menu - Tag Rank",
 	"Options Menu - Tag Admin",
-	"Options Menu - Tag VIP"
+	"Options Menu - Tag VIP",
+	"Options Menu - Tag VIP+",
+	"Options Menu - Tag VIP++",
+	"Options Menu - Tag Custom - boa",
+	"Options Menu - Tag Custom - Meower",
+	"Options Menu - Tag Custom - cat",
+	"Options Menu - Tag Custom - mal0 lover",
+	"Options Menu - Tag Custom - isaac"
 };
 
 stock int gI_ProfileOptionCounts[PROFILEOPTION_COUNT] = 
@@ -242,8 +256,15 @@ stock int gI_ProfileOptionDefaults[PROFILEOPTION_COUNT] =
 };
 
 #define PROFILE_OPTION_CATEGORY "Profile"
-#define TAG_COLOR_ADMIN "{red}"
-#define TAG_COLOR_VIP   "{purple}"
+#define TAG_COLOR_ADMIN 		"{red}"
+#define TAG_COLOR_VIP   		"{purple}"
+#define TAG_COLOR_VIP_PLUS 		"{purple}"
+#define TAG_COLOR_VIP_PLUS_PLUS "{purple}"
+#define TAG_COLOR_BOA			"{darkred}"
+#define TAG_COLOR_MEOWER		"{orchid}"
+#define TAG_COLOR_CAT			"{orchid}"
+#define TAG_COLOR_MAL0_LOVER	"{green}" // would be black but that doesnt exist on csgo
+#define TAG_COLOR_ISAAC			"{darkred}"
 
 
 // =====[ FORWARDS ]=====
