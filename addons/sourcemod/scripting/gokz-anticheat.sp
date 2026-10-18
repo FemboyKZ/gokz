@@ -41,6 +41,7 @@ int gI_ButtonCount[MAXPLAYERS + 1];
 int gI_ButtonsIndex[MAXPLAYERS + 1];
 int gI_Buttons[MAXPLAYERS + 1][AC_MAX_BUTTON_SAMPLES];
 
+// Legacy tracking (original method, sends to Global API)
 int gI_BhopCount[MAXPLAYERS + 1];
 int gI_BhopIndex[MAXPLAYERS + 1];
 int gI_BhopLastTakeoffCmdnum[MAXPLAYERS + 1];
@@ -53,6 +54,24 @@ bool gB_LastLandingWasValid[MAXPLAYERS + 1];
 bool gB_BindExceptionPending[MAXPLAYERS + 1];
 bool gB_BindExceptionPostPending[MAXPLAYERS + 1];
 
+// V2 tracking (jumpbug-aware method, local/SBPP bans only)
+int gI_ButtonCountV2[MAXPLAYERS + 1];
+int gI_ButtonsIndexV2[MAXPLAYERS + 1];
+int gI_ButtonsV2[MAXPLAYERS + 1][AC_MAX_BUTTON_SAMPLES];
+
+int gI_BhopCountV2[MAXPLAYERS + 1];
+int gI_BhopIndexV2[MAXPLAYERS + 1];
+int gI_BhopLastTakeoffCmdnumV2[MAXPLAYERS + 1];
+int gI_BhopLastRecordedBhopCmdnumV2[MAXPLAYERS + 1];
+bool gB_BhopHitPerfV2[MAXPLAYERS + 1][AC_MAX_BHOP_SAMPLES];
+int gI_BhopPreJumpInputsV2[MAXPLAYERS + 1][AC_MAX_BHOP_SAMPLES];
+int gI_BhopPostJumpInputsV2[MAXPLAYERS + 1][AC_MAX_BHOP_SAMPLES];
+bool gB_BhopPostJumpInputsPendingV2[MAXPLAYERS + 1];
+bool gB_LastLandingWasValidV2[MAXPLAYERS + 1];
+bool gB_BindExceptionPendingV2[MAXPLAYERS + 1];
+bool gB_BindExceptionPostPendingV2[MAXPLAYERS + 1];
+bool gB_SuspectedV2[MAXPLAYERS + 1];
+
 ConVar gCV_gokz_autoban;
 ConVar gCV_gokz_autoban_duration_bhop_hack;
 ConVar gCV_gokz_autoban_duration_bhop_macro;
@@ -60,6 +79,7 @@ ConVar gCV_sv_autobunnyhopping;
 
 #include "gokz-anticheat/api.sp"
 #include "gokz-anticheat/bhop_tracking.sp"
+#include "gokz-anticheat/bhop_tracking_v2.sp"
 #include "gokz-anticheat/commands.sp"
 
 
@@ -124,6 +144,7 @@ public void OnLibraryRemoved(const char[] name)
 public void OnClientPutInServer(int client)
 {
 	OnClientPutInServer_BhopTracking(client);
+	OnClientPutInServer_BhopTrackingV2(client);
 	HookClientEvents(client);
 }
 
@@ -140,7 +161,9 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 		return;
 	}
 	
-	OnPlayerRunCmdPost_BhopTracking(client, buttons, cmdnum);
+	// Process both tracking systems
+	OnPlayerRunCmdPost_BhopTracking(client, buttons, cmdnum);     // Legacy (Global API)
+	OnPlayerRunCmdPost_BhopTrackingV2(client, buttons, cmdnum);   // V2 (Local/SBPP only)
 }
 
 public MRESReturn DHooks_OnTeleport(int client, Handle params)
@@ -171,6 +194,8 @@ public void GOKZ_AC_OnPlayerSuspected(int client, ACReason reason, const char[] 
 void SuspectPlayer(int client, ACReason reason, const char[] notes, const char[] stats)
 {
 	Call_OnPlayerSuspected(client, reason, notes, stats);
+	// BanClient/SBPP kick later, so V2 would otherwise ban again on the same sample
+	gB_SuspectedV2[client] = true;
 	
 	if (gB_GOKZLocalDB)
 	{

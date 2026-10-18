@@ -17,6 +17,9 @@ void DB_CreateTables()
 			txn.AddQuery(sqlite_mapcourses_create);
 			txn.AddQuery(sqlite_times_create);
 			txn.AddQuery(sqlite_jumpstats_create);
+			txn.AddQuery(sqlite_acstats_create);
+			txn.AddQuery(sqlite_playercvars_create);
+			txn.AddQuery(sqlite_playercvars_index);
 			txn.AddQuery(sqlite_vbpos_create);
 			txn.AddQuery(sqlite_startpos_create);
 		}
@@ -27,6 +30,8 @@ void DB_CreateTables()
 			txn.AddQuery(mysql_mapcourses_create);
 			txn.AddQuery(mysql_times_create);
 			txn.AddQuery(mysql_jumpstats_create);
+			txn.AddQuery(mysql_acstats_create);
+			txn.AddQuery(mysql_playercvars_create);
 			txn.AddQuery(mysql_vbpos_create);
 			txn.AddQuery(mysql_startpos_create);
 		}

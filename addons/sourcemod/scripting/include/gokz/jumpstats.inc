@@ -296,6 +296,40 @@ enum struct Jump
 	float strafes_loss[JS_MAX_TRACKED_STRAFES];
 	float strafes_sync[JS_MAX_TRACKED_STRAFES];
 	float strafes_width[JS_MAX_TRACKED_STRAFES];
+
+	// Anti-cheat strafe features, filled by ComputeAcFeatures() at landing.
+	float acEffMean; // per-tick gain / optimal gain, averaged
+	float acEffStd;
+	float acYawResidualRms; // |deltaYaw| vs optimal turn rate, deg/tick
+	float acKFit; // yaw per mouse count, ~m_yaw * fps / tickrate, can be negative, acKResidualRms -1.0 marks no fit
+	float acKResidualRms; // -1.0 when too little mouse data
+	float acFlipLagMean; // key press vs turn flip offset, ticks
+	float acFlipLagStd;
+	float acStrafeLenMean; // edge strafes excluded
+	float acStrafeLenStd;
+	float acPeakDeltaYaw; // deg/tick, turn binds excluded
+	float acFlipSharpness; // flip |accel| over neighbor |accel|, mean
+	int acFlipImpulses; // flips landing the whole turn in one tick
+	int acFlipAccelSamples; // flips with enough surrounding ticks
+	int acCeilingTicks; // turning ticks within 2% of the peak
+	int acTurnTicks; // turning ticks measured for the ceiling stats
+	int acSpinTicks; // ticks turning faster than any strafe (snap/spin)
+	int acTurnBindTicks; // ticks with +left/+right held
+	int acInjectedTicks; // turned past 3x kFit with zero mouse input, no turn bind, off strafe flips
+	int acMouseTicks; // ticks with nonzero mouse x
+	int acYawlessMouseTicks; // mouse moved, view did not (+strafe / m_yaw 0)
+	float acKPitchFit; // pitch per mouse y count, ~m_pitch * fps / tickrate
+	int acPitchSamples; // ticks the pitch fit was made from
+	int acMouseYDeadTicks; // mouse x active, mouse y exactly 0
+	int acPitchFrozenTicks; // mouse y active, pitch unchanged (m_pitch ~0)
+	int acCmdGapTicks; // ticks with a non-consecutive usercmd number
+	int acSidemoveGhostTicks; // sidemove without an A/D button held
+	int acSidemoveNullTicks; // A/D held but zero sidemove (null bind/SOCD)
+	int acSidemoveMismatchTicks; // sidemove against the held key
+	int acRollTicks; // nonzero roll angle, never legit input
+	int acFlipMatched; // strafe flips with a matching key press found
+	int acFlipZeroLag; // matched flips where key and turn changed same tick
+	int acUsableTicks; // air ticks the features were computed over
 }
 
 
@@ -337,6 +371,12 @@ forward void GOKZ_JS_OnFailstat(Jump jump);
  * @param jump			The jumpstats.
  */
 forward void GOKZ_JS_OnJumpstatAlways(Jump jump);
+
+/**
+ * Called when a mid-air jump is cut short by a teleport.
+ * @param jump			The jumpstats.
+ */
+forward void GOKZ_JS_OnJumpAborted(Jump jump);
 
 /**
  * Called when a player fails a jump and has always-on failstats enabled.

@@ -319,6 +319,264 @@ SELECT MAX(js.Distance), js.Mode, js.JumpType, js.Block \
 
 
 
+// =====[ ANTICHEAT STATS ]=====
+// Running per-player aggregates of the anti-cheat strafe features, one row per (player, mode, jump type).
+// Sums accumulate per jump so mean/std per metric fall out of a single SELECT.
+// See gokz-jumpstats/anticheat_metrics.sp.
+
+char sqlite_acstats_create[] = "\
+CREATE TABLE IF NOT EXISTS AnticheatStats ( \
+    SteamID32 INTEGER NOT NULL, \
+    Mode INTEGER NOT NULL, \
+    JumpType INTEGER NOT NULL, \
+    Jumps INTEGER NOT NULL, \
+    UsableTicks INTEGER NOT NULL, \
+    TurnTicks INTEGER NOT NULL, \
+    TurnBindTicks INTEGER NOT NULL, \
+    CeilingTicks INTEGER NOT NULL, \
+    SpinTicks INTEGER NOT NULL, \
+    MouseTicks INTEGER NOT NULL, \
+    YawlessMouseTicks INTEGER NOT NULL, \
+    MouseYDeadTicks INTEGER NOT NULL, \
+    PitchFrozenTicks INTEGER NOT NULL, \
+    CmdGapTicks INTEGER NOT NULL, \
+    SidemoveGhostTicks INTEGER NOT NULL, \
+    SidemoveNullTicks INTEGER NOT NULL, \
+    SidemoveMismatchTicks INTEGER NOT NULL, \
+    RollTicks INTEGER NOT NULL, \
+    InjectedTicks INTEGER NOT NULL, \
+    FlipMatched INTEGER NOT NULL, \
+    FlipZeroLag INTEGER NOT NULL, \
+    YawResJumps INTEGER NOT NULL, \
+    KJumps INTEGER NOT NULL, \
+    KPitchJumps INTEGER NOT NULL, \
+    LenStdJumps INTEGER NOT NULL, \
+    PeakJumps INTEGER NOT NULL, \
+    FlipImpulses INTEGER NOT NULL, \
+    FlipAccelSamples INTEGER NOT NULL, \
+    SharpJumps INTEGER NOT NULL, \
+    EffSum REAL NOT NULL, \
+    EffSqSum REAL NOT NULL, \
+    YawResSum REAL NOT NULL, \
+    YawResSqSum REAL NOT NULL, \
+    KResSum REAL NOT NULL, \
+    KResSqSum REAL NOT NULL, \
+    KFitSum REAL NOT NULL, \
+    KFitSqSum REAL NOT NULL, \
+    KPitchSum REAL NOT NULL, \
+    KPitchSqSum REAL NOT NULL, \
+    LenStdSum REAL NOT NULL, \
+    LenStdSqSum REAL NOT NULL, \
+    FlipLagSum REAL NOT NULL, \
+    FlipLagSqSum REAL NOT NULL, \
+    PeakSum REAL NOT NULL, \
+    PeakSqSum REAL NOT NULL, \
+    SharpSum REAL NOT NULL, \
+    SharpSqSum REAL NOT NULL, \
+    Updated INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP, \
+    CONSTRAINT PK_AnticheatStats PRIMARY KEY (SteamID32, Mode, JumpType), \
+    CONSTRAINT FK_AnticheatStats_SteamID32 FOREIGN KEY (SteamID32) REFERENCES Players(SteamID32) \
+    ON DELETE CASCADE)";
+
+char mysql_acstats_create[] = "\
+CREATE TABLE IF NOT EXISTS AnticheatStats ( \
+    SteamID32 INTEGER UNSIGNED NOT NULL, \
+    Mode TINYINT UNSIGNED NOT NULL, \
+    JumpType TINYINT UNSIGNED NOT NULL, \
+    Jumps INTEGER UNSIGNED NOT NULL, \
+    UsableTicks INTEGER UNSIGNED NOT NULL, \
+    TurnTicks INTEGER UNSIGNED NOT NULL, \
+    TurnBindTicks INTEGER UNSIGNED NOT NULL, \
+    CeilingTicks INTEGER UNSIGNED NOT NULL, \
+    SpinTicks INTEGER UNSIGNED NOT NULL, \
+    MouseTicks INTEGER UNSIGNED NOT NULL, \
+    YawlessMouseTicks INTEGER UNSIGNED NOT NULL, \
+    MouseYDeadTicks INTEGER UNSIGNED NOT NULL, \
+    PitchFrozenTicks INTEGER UNSIGNED NOT NULL, \
+    CmdGapTicks INTEGER UNSIGNED NOT NULL, \
+    SidemoveGhostTicks INTEGER UNSIGNED NOT NULL, \
+    SidemoveNullTicks INTEGER UNSIGNED NOT NULL, \
+    SidemoveMismatchTicks INTEGER UNSIGNED NOT NULL, \
+    RollTicks INTEGER UNSIGNED NOT NULL, \
+    InjectedTicks INTEGER UNSIGNED NOT NULL, \
+    FlipMatched INTEGER UNSIGNED NOT NULL, \
+    FlipZeroLag INTEGER UNSIGNED NOT NULL, \
+    YawResJumps INTEGER UNSIGNED NOT NULL, \
+    KJumps INTEGER UNSIGNED NOT NULL, \
+    KPitchJumps INTEGER UNSIGNED NOT NULL, \
+    LenStdJumps INTEGER UNSIGNED NOT NULL, \
+    PeakJumps INTEGER UNSIGNED NOT NULL, \
+    FlipImpulses INTEGER UNSIGNED NOT NULL, \
+    FlipAccelSamples INTEGER UNSIGNED NOT NULL, \
+    SharpJumps INTEGER UNSIGNED NOT NULL, \
+    EffSum DOUBLE NOT NULL, \
+    EffSqSum DOUBLE NOT NULL, \
+    YawResSum DOUBLE NOT NULL, \
+    YawResSqSum DOUBLE NOT NULL, \
+    KResSum DOUBLE NOT NULL, \
+    KResSqSum DOUBLE NOT NULL, \
+    KFitSum DOUBLE NOT NULL, \
+    KFitSqSum DOUBLE NOT NULL, \
+    KPitchSum DOUBLE NOT NULL, \
+    KPitchSqSum DOUBLE NOT NULL, \
+    LenStdSum DOUBLE NOT NULL, \
+    LenStdSqSum DOUBLE NOT NULL, \
+    FlipLagSum DOUBLE NOT NULL, \
+    FlipLagSqSum DOUBLE NOT NULL, \
+    PeakSum DOUBLE NOT NULL, \
+    PeakSqSum DOUBLE NOT NULL, \
+    SharpSum DOUBLE NOT NULL, \
+    SharpSqSum DOUBLE NOT NULL, \
+    Updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, \
+    CONSTRAINT PK_AnticheatStats PRIMARY KEY (SteamID32, Mode, JumpType), \
+    CONSTRAINT FK_AnticheatStats_SteamID32 FOREIGN KEY (SteamID32) REFERENCES Players(SteamID32) \
+    ON DELETE CASCADE)";
+
+char sqlite_acstats_upsert[] = "\
+INSERT INTO AnticheatStats (SteamID32, Mode, JumpType, Jumps, UsableTicks, TurnTicks, TurnBindTicks, \
+        CeilingTicks, SpinTicks, MouseTicks, YawlessMouseTicks, MouseYDeadTicks, PitchFrozenTicks, CmdGapTicks, \
+        SidemoveGhostTicks, SidemoveNullTicks, SidemoveMismatchTicks, RollTicks, \
+        InjectedTicks, FlipMatched, FlipZeroLag, YawResJumps, KJumps, KPitchJumps, LenStdJumps, PeakJumps, \
+        FlipImpulses, FlipAccelSamples, SharpJumps, \
+        EffSum, EffSqSum, YawResSum, YawResSqSum, KResSum, KResSqSum, KFitSum, KFitSqSum, KPitchSum, KPitchSqSum, LenStdSum, LenStdSqSum, \
+        FlipLagSum, FlipLagSqSum, PeakSum, PeakSqSum, SharpSum, SharpSqSum, Updated) \
+    VALUES (%d, %d, %d, 1, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, CURRENT_TIMESTAMP) \
+    ON CONFLICT (SteamID32, Mode, JumpType) DO UPDATE SET \
+        Jumps = Jumps + 1, \
+        UsableTicks = UsableTicks + excluded.UsableTicks, \
+        TurnTicks = TurnTicks + excluded.TurnTicks, \
+        TurnBindTicks = TurnBindTicks + excluded.TurnBindTicks, \
+        CeilingTicks = CeilingTicks + excluded.CeilingTicks, \
+        SpinTicks = SpinTicks + excluded.SpinTicks, \
+        MouseTicks = MouseTicks + excluded.MouseTicks, \
+        YawlessMouseTicks = YawlessMouseTicks + excluded.YawlessMouseTicks, \
+        MouseYDeadTicks = MouseYDeadTicks + excluded.MouseYDeadTicks, \
+        PitchFrozenTicks = PitchFrozenTicks + excluded.PitchFrozenTicks, \
+        CmdGapTicks = CmdGapTicks + excluded.CmdGapTicks, \
+        SidemoveGhostTicks = SidemoveGhostTicks + excluded.SidemoveGhostTicks, \
+        SidemoveNullTicks = SidemoveNullTicks + excluded.SidemoveNullTicks, \
+        SidemoveMismatchTicks = SidemoveMismatchTicks + excluded.SidemoveMismatchTicks, \
+        RollTicks = RollTicks + excluded.RollTicks, \
+        InjectedTicks = InjectedTicks + excluded.InjectedTicks, \
+        FlipMatched = FlipMatched + excluded.FlipMatched, \
+        FlipZeroLag = FlipZeroLag + excluded.FlipZeroLag, \
+        YawResJumps = YawResJumps + excluded.YawResJumps, \
+        KJumps = KJumps + excluded.KJumps, \
+        KPitchJumps = KPitchJumps + excluded.KPitchJumps, \
+        LenStdJumps = LenStdJumps + excluded.LenStdJumps, \
+        PeakJumps = PeakJumps + excluded.PeakJumps, \
+        FlipImpulses = FlipImpulses + excluded.FlipImpulses, \
+        FlipAccelSamples = FlipAccelSamples + excluded.FlipAccelSamples, \
+        SharpJumps = SharpJumps + excluded.SharpJumps, \
+        EffSum = EffSum + excluded.EffSum, \
+        EffSqSum = EffSqSum + excluded.EffSqSum, \
+        YawResSum = YawResSum + excluded.YawResSum, \
+        YawResSqSum = YawResSqSum + excluded.YawResSqSum, \
+        KResSum = KResSum + excluded.KResSum, \
+        KResSqSum = KResSqSum + excluded.KResSqSum, \
+        KFitSum = KFitSum + excluded.KFitSum, \
+        KFitSqSum = KFitSqSum + excluded.KFitSqSum, \
+        KPitchSum = KPitchSum + excluded.KPitchSum, \
+        KPitchSqSum = KPitchSqSum + excluded.KPitchSqSum, \
+        LenStdSum = LenStdSum + excluded.LenStdSum, \
+        LenStdSqSum = LenStdSqSum + excluded.LenStdSqSum, \
+        FlipLagSum = FlipLagSum + excluded.FlipLagSum, \
+        FlipLagSqSum = FlipLagSqSum + excluded.FlipLagSqSum, \
+        PeakSum = PeakSum + excluded.PeakSum, \
+        PeakSqSum = PeakSqSum + excluded.PeakSqSum, \
+        SharpSum = SharpSum + excluded.SharpSum, \
+        SharpSqSum = SharpSqSum + excluded.SharpSqSum, \
+        Updated = CURRENT_TIMESTAMP";
+
+char mysql_acstats_upsert[] = "\
+INSERT INTO AnticheatStats (SteamID32, Mode, JumpType, Jumps, UsableTicks, TurnTicks, TurnBindTicks, \
+        CeilingTicks, SpinTicks, MouseTicks, YawlessMouseTicks, MouseYDeadTicks, PitchFrozenTicks, CmdGapTicks, \
+        SidemoveGhostTicks, SidemoveNullTicks, SidemoveMismatchTicks, RollTicks, \
+        InjectedTicks, FlipMatched, FlipZeroLag, YawResJumps, KJumps, KPitchJumps, LenStdJumps, PeakJumps, \
+        FlipImpulses, FlipAccelSamples, SharpJumps, \
+        EffSum, EffSqSum, YawResSum, YawResSqSum, KResSum, KResSqSum, KFitSum, KFitSqSum, KPitchSum, KPitchSqSum, LenStdSum, LenStdSqSum, \
+        FlipLagSum, FlipLagSqSum, PeakSum, PeakSqSum, SharpSum, SharpSqSum) \
+    VALUES (%d, %d, %d, 1, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f) \
+    ON DUPLICATE KEY UPDATE \
+        Jumps = Jumps + 1, \
+        UsableTicks = UsableTicks + VALUES(UsableTicks), \
+        TurnTicks = TurnTicks + VALUES(TurnTicks), \
+        TurnBindTicks = TurnBindTicks + VALUES(TurnBindTicks), \
+        CeilingTicks = CeilingTicks + VALUES(CeilingTicks), \
+        SpinTicks = SpinTicks + VALUES(SpinTicks), \
+        MouseTicks = MouseTicks + VALUES(MouseTicks), \
+        YawlessMouseTicks = YawlessMouseTicks + VALUES(YawlessMouseTicks), \
+        MouseYDeadTicks = MouseYDeadTicks + VALUES(MouseYDeadTicks), \
+        PitchFrozenTicks = PitchFrozenTicks + VALUES(PitchFrozenTicks), \
+        CmdGapTicks = CmdGapTicks + VALUES(CmdGapTicks), \
+        SidemoveGhostTicks = SidemoveGhostTicks + VALUES(SidemoveGhostTicks), \
+        SidemoveNullTicks = SidemoveNullTicks + VALUES(SidemoveNullTicks), \
+        SidemoveMismatchTicks = SidemoveMismatchTicks + VALUES(SidemoveMismatchTicks), \
+        RollTicks = RollTicks + VALUES(RollTicks), \
+        InjectedTicks = InjectedTicks + VALUES(InjectedTicks), \
+        FlipMatched = FlipMatched + VALUES(FlipMatched), \
+        FlipZeroLag = FlipZeroLag + VALUES(FlipZeroLag), \
+        YawResJumps = YawResJumps + VALUES(YawResJumps), \
+        KJumps = KJumps + VALUES(KJumps), \
+        KPitchJumps = KPitchJumps + VALUES(KPitchJumps), \
+        LenStdJumps = LenStdJumps + VALUES(LenStdJumps), \
+        PeakJumps = PeakJumps + VALUES(PeakJumps), \
+        FlipImpulses = FlipImpulses + VALUES(FlipImpulses), \
+        FlipAccelSamples = FlipAccelSamples + VALUES(FlipAccelSamples), \
+        SharpJumps = SharpJumps + VALUES(SharpJumps), \
+        EffSum = EffSum + VALUES(EffSum), \
+        EffSqSum = EffSqSum + VALUES(EffSqSum), \
+        YawResSum = YawResSum + VALUES(YawResSum), \
+        YawResSqSum = YawResSqSum + VALUES(YawResSqSum), \
+        KResSum = KResSum + VALUES(KResSum), \
+        KResSqSum = KResSqSum + VALUES(KResSqSum), \
+        KFitSum = KFitSum + VALUES(KFitSum), \
+        KFitSqSum = KFitSqSum + VALUES(KFitSqSum), \
+        KPitchSum = KPitchSum + VALUES(KPitchSum), \
+        KPitchSqSum = KPitchSqSum + VALUES(KPitchSqSum), \
+        LenStdSum = LenStdSum + VALUES(LenStdSum), \
+        LenStdSqSum = LenStdSqSum + VALUES(LenStdSqSum), \
+        FlipLagSum = FlipLagSum + VALUES(FlipLagSum), \
+        FlipLagSqSum = FlipLagSqSum + VALUES(FlipLagSqSum), \
+        PeakSum = PeakSum + VALUES(PeakSum), \
+        PeakSqSum = PeakSqSum + VALUES(PeakSqSum), \
+        SharpSum = SharpSum + VALUES(SharpSum), \
+        SharpSqSum = SharpSqSum + VALUES(SharpSqSum)";
+
+
+
+// =====[ PLAYER CVARS ]=====
+
+char sqlite_playercvars_create[] = "\
+CREATE TABLE IF NOT EXISTS PlayerCvars ( \
+    SteamID32 INTEGER NOT NULL, \
+    Cvar VARCHAR(32) NOT NULL, \
+    Value VARCHAR(32) NOT NULL, \
+    Created INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP, \
+    CONSTRAINT FK_PlayerCvars_SteamID32 FOREIGN KEY (SteamID32) REFERENCES Players(SteamID32) \
+    ON DELETE CASCADE)";
+
+char sqlite_playercvars_index[] = "\
+CREATE INDEX IF NOT EXISTS IX_PlayerCvars_Player \
+    ON PlayerCvars (SteamID32, Cvar, Created)";
+
+char mysql_playercvars_create[] = "\
+CREATE TABLE IF NOT EXISTS PlayerCvars ( \
+    SteamID32 INTEGER UNSIGNED NOT NULL, \
+    Cvar VARCHAR(32) NOT NULL, \
+    Value VARCHAR(32) NOT NULL, \
+    Created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, \
+    KEY IX_PlayerCvars_Player (SteamID32, Cvar, Created), \
+    CONSTRAINT FK_PlayerCvars_SteamID32 FOREIGN KEY (SteamID32) REFERENCES Players(SteamID32) \
+    ON DELETE CASCADE)";
+
+// Both %s must be pre-escaped
+char sql_playercvars_insert[] = "\
+INSERT INTO PlayerCvars (SteamID32, Cvar, Value) \
+    VALUES (%d, '%s', '%s')";
+
+
+
 // =====[ VB POSITIONS ]=====
 
 char sqlite_vbpos_create[] = "\
