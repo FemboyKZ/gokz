@@ -20,20 +20,38 @@
 	Becoming airborne, including jumping, falling, getting off a ladder and leaving noclip.
 
 	Landing
-	Leaving the air, including landing on the ground, grabbing a ladder and entering noclip.
+	Leaving the air, including landing on the ground, grabbing a ladder, leaving noclip
+	while on ground and entering noclip.
 
 	Perfect Bunnyhop (Perf)
 	When the player has jumped in the tick after landing and keeps their speed.
 
  	Duckbug/Crouchbug
-	When the player sucessfully lands due to uncrouching from mid air and not by falling 
+	When the player successfully lands due to uncrouching from mid air and not by falling
 	down. This causes no stamina loss or fall damage upon landing.
 
 	Jumpbug
- 	This is achieved by duckbugging and jumping at the same time. The player is never seen 
-	as 'on ground' when bunnyhopping from a tick by tick perspective. A jumpbug inherits 
-	the same behavior as a duckbug/crouchbug, along with its effects such as maintaining 
+ 	This is achieved by duckbugging and jumping at the same time. The player is never seen
+	as 'on ground' when bunnyhopping from a tick by tick perspective. A jumpbug inherits
+	the same behavior as a duckbug/crouchbug, along with its effects such as maintaining
 	speed due to no stamina loss.
+
+	Edgebug
+	When the player hits the very edge of a block and slides off it within the same tick,
+	before the ground check runs. The flat contact zeroes their vertical velocity, but
+	they start and end the tick airborne, keeping horizontal speed and taking no fall
+	damage.
+
+	Pixelsurf
+	When the player stays suspended on the seam between two flush wall brushes. The engine
+	keeps clipping them against the invisible top plane of the lower brush each tick,
+	letting them hang on the wall and slide along it with no floor beneath. Requires being
+	within 0.03125 units above the seam while pressed against the wall.
+
+	Texturebug
+	When the player falls past the open underside of an overhanging brush while hugging
+	its wall. The engine briefly clips them against the brush's top plane instead of the
+	side they actually crossed, zeroing vertical velocity mid-air for that tick.
 
 	Distbug
 	Landing behavior varies depending on whether the player lands close to the edge of a 
@@ -108,7 +126,14 @@ forward void Movement_OnStopDucking(int client);
 forward void Movement_OnPlayerJump(int client, bool jumpbug);
 
 /**
- * Called when a player edgebugs
+ * Called when a player edgebugs.
+ * Fires at most once per tick.
+ * A pixelsurf or texturebug matches the same signature,
+ * so a tick detected as either raises its own forward instead and this one stays silent.
+ * Only flat contact counts, meaning a plane normal z of at least 0.999,
+ * so a plain slope landing does not qualify.
+ * With bsppeek, displacement contacts use the collision mesh's true tri normal,
+ * since hull traces report coarse normals at disp seams.
  * Setting velocity when this is called may not be effective.
  *
  * @param client		Client index.
@@ -116,6 +141,32 @@ forward void Movement_OnPlayerJump(int client, bool jumpbug);
  * @param velocity		Player velocity before edgebug.
  */
 forward void Movement_OnPlayerEdgebug(int client, float origin[3], float velocity[3]);
+
+/**
+ * Called when a player pixelsurfs.
+ * Fires at most once per tick, and once per tick the player stays suspended on the surf.
+ * Takes priority over Movement_OnPlayerEdgebug, which is suppressed for that tick.
+ * With the bsppeek extension the seam is verified against the map's brush tables.
+ * Falls back to ray probing when the extension is absent or the tables cannot resolve the seam.
+ * Setting velocity when this is called may not be effective.
+ *
+ * @param client		Client index.
+ * @param origin		Player origin before pixelsurf.
+ * @param velocity		Player velocity before pixelsurf.
+ */
+forward void Movement_OnPlayerPixelsurf(int client, float origin[3], float velocity[3]);
+
+/**
+ * Called when a player texturebugs.
+ * Fires at most once per tick and suppresses Movement_OnPlayerEdgebug for that tick.
+ * Requires the bsppeek extension. Without it such ticks are reported as edgebugs.
+ * Setting velocity when this is called may not be effective.
+ *
+ * @param client		Client index.
+ * @param origin		Player origin before texturebug.
+ * @param velocity		Player velocity before texturebug.
+ */
+forward void Movement_OnPlayerTexturebug(int client, float origin[3], float velocity[3]);
 
 /**
  * Called before PlayerMove movement function is called.
@@ -380,6 +431,16 @@ native int Movement_GetTakeoffTick(int client);
 native int Movement_GetTakeoffCmdNum(int client);
 
 /**
+ * Gets the plane normal of the ladder the player last took off from.
+ * The engine pushes a ladder jump along this normal at 270 u/s.
+ *
+ * @param client		Client index.
+ * @param result		Ladder normal, zero vector if the last takeoff was not from a ladder.
+ * @return				True if the last takeoff was from a ladder.
+ */
+native bool Movement_GetTakeoffLadderNormal(int client, float result[3]);
+
+/**
  * Gets a player's origin at the time of their last landing with the distbug fixed.
  *
  * @param client		Client index.
@@ -525,21 +586,32 @@ native void Movement_SetLandingOrigin(int client, float origin[3]);
 native void Movement_SetLandingVelocity(int client, float velocity[3]);
 
 /**
+ * Largest number of collisions MovementAPI stores per tick.
+ * An index below the reported count is always safe to pass to the accessors below.
+ */
+#define MOVEMENT_MAX_COLLISIONS 4
+
+/**
  * Get the player's number of collisions during movement processing.
  * This function should ideally be called after inside Movement_OnTryPlayerMovePost.
- * 
+ *
+ * Every blocking bump trace of the most recent TryPlayerMove call, in bump order,
+ * including repeated contacts with the world (wall then floor reports both).
+ * Reset on each TryPlayerMove call, and StepMove can run two per tick.
+ *
  * @param client     Client index.
- * @return           Number of collisions.
+ * @return           Number of collisions stored, 0 to MOVEMENT_MAX_COLLISIONS.
  */
 native int Movement_GetCollisionCount(int client);
 
 /**
- * Set the player's landing velocity.
+ * Get the start origin of a player's collision during movement processing.
  * This function should ideally be called after inside Movement_OnTryPlayerMovePost.
  *
  * @param client     Client index.
  * @param num		 Collision number, must not exceed Movement_GetCollisionCount's value.
  * @param result	 Resultant vector.
+ * @error            Index out of range or not below the current collision count.
  */
 native void Movement_GetCollisionStartOrigin(int client, int num, float result[3]);
 
@@ -550,6 +622,7 @@ native void Movement_GetCollisionStartOrigin(int client, int num, float result[3
  * @param client     Client index.
  * @param num		 Collision number, must not exceed Movement_GetCollisionCount's value.
  * @param result	 Resultant vector.
+ * @error            Index out of range or not below the current collision count.
  */
 native void Movement_GetCollisionEndOrigin(int client, int num, float result[3]);
 
@@ -560,6 +633,7 @@ native void Movement_GetCollisionEndOrigin(int client, int num, float result[3])
  * @param client     Client index.
  * @param num		 Collision number, must not exceed Movement_GetCollisionCount's value.
  * @param result	 Resultant vector.
+ * @error            Index out of range or not below the current collision count.
  */
 native void Movement_GetCollisionNormal(int client, int num, float result[3]);
 
@@ -617,6 +691,11 @@ methodmap MovementAPIPlayer < MovementPlayer {
 		public get() {
 			return Movement_GetTakeoffCmdNum(this.ID);
 		}
+	}
+
+	public bool GetTakeoffLadderNormal(float buffer[3])
+	{
+		return Movement_GetTakeoffLadderNormal(this.ID, buffer);
 	}
 	
 	public void GetLandingOrigin(float buffer[3]) {
@@ -735,6 +814,7 @@ public void __pl_movementapi_SetNTVOptional()
 	MarkNativeAsOptional("Movement_GetTakeoffSpeed");
 	MarkNativeAsOptional("Movement_GetTakeoffTick");
 	MarkNativeAsOptional("Movement_GetTakeoffCmdNum");
+	MarkNativeAsOptional("Movement_GetTakeoffLadderNormal");
 	MarkNativeAsOptional("Movement_GetLandingOrigin");
 	MarkNativeAsOptional("Movement_GetLandingVelocity");
 	MarkNativeAsOptional("Movement_GetLandingSpeed");
