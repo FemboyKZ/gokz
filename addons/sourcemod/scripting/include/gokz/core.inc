@@ -1642,7 +1642,7 @@ stock void GOKZ_MenuAddModeItems(int client, Menu menu, bool disableUnloadedMode
 			Format(display, sizeof(display), "%s*", display);
 		}
 		
-		if (GOKZ_GetModeLoaded(mode))
+		if (!disableUnloadedModes || GOKZ_GetModeLoaded(mode))
 		{
 			menu.AddItem("", display, ITEMDRAW_DEFAULT);
 		}
@@ -1785,7 +1785,7 @@ stock int GOKZ_MatchIntFromEntityName(int entity, Regex re, int substringID)
 	
 	if (re.Match(buffer) > 0)
 	{
-		re.GetSubString(1, buffer, sizeof(buffer));
+		re.GetSubString(substringID, buffer, sizeof(buffer));
 		num = StringToInt(buffer);
 	}
 	
@@ -1826,7 +1826,7 @@ stock void GOKZ_EmitSoundToClientSpectators(int client, const char[] sample, flo
 	{
 		if (IsValidClient(i) && GetObserverTarget(i) == client)
 		{
-			GOKZ_EmitSoundToClient(i, sample, volume);
+			GOKZ_EmitSoundToClient(i, sample, volume, description);
 		}
 	}
 }
