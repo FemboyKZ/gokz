@@ -5,6 +5,7 @@ void RegisterCommands()
 	RegConsoleCmd("sm_measure", CommandMeasureMenu, "[KZ] Open the measurement menu.");
 	RegConsoleCmd("sm_measuremenu", CommandMeasureMenu, "[KZ] Open the measurement menu.");
 	RegConsoleCmd("sm_measureblock", CommandMeasureBlock, "[KZ] Measure the block distance.");
+	RegConsoleCmd("sm_measuredetailed", CommandMeasureDetailed, "[KZ] Toggle detailed measure output.");
 }
 
 public Action CommandMeasureMenu(int client, int args)
@@ -45,5 +46,24 @@ public Action CommandMeasureBlock(int client, int args)
 	}
 	MeasureBlock(client);
 	CreateTimer(4.9, Timer_DeletePoints, GetClientUserId(client));
+	return Plugin_Handled;
+}
+
+
+public Action CommandMeasureDetailed(int client, int args)
+{
+	if (!IsValidClient(client))
+	{
+		return Plugin_Handled;
+	}
+	gB_MeasureDetailed[client] = !gB_MeasureDetailed[client];
+	if (gB_MeasureDetailed[client])
+	{
+		GOKZ_PrintToChat(client, true, "{lime}Detailed measure output enabled{grey} - XYZ coordinates will be shown.");
+	}
+	else
+	{
+		GOKZ_PrintToChat(client, true, "{darkred}Detailed measure output disabled{grey}.");
+	}
 	return Plugin_Handled;
 }

@@ -60,6 +60,7 @@
 * `!measure`/`!measuremenu` - Open the distance measurement menu.
 * `+measure` - Start measuring (bind to a key)
 * `!measureblock` - Measure the gap of a block you're currently aiming at.
+* `!measuredetailed` - Toggle detailed measure output.
 
 ### gokz-goto
 

@@ -16,7 +16,7 @@
 public Plugin myinfo = 
 {
 	name = "GOKZ Measure", 
-	author = "DanZay", 
+	author = "DanZay, (FKZ mod)", 
 	description = "Provides tools for measuring things", 
 	version = GOKZ_VERSION, 
 	url = GOKZ_SOURCE_URL
@@ -30,6 +30,7 @@ float gF_MeasurePos[MAXPLAYERS + 1][2][3];
 float gF_MeasureNormal[MAXPLAYERS + 1][2][3];
 Handle gH_P2PRed[MAXPLAYERS + 1];
 Handle gH_P2PGreen[MAXPLAYERS + 1];
+bool gB_MeasureDetailed[MAXPLAYERS + 1];
 
 #include "gokz-measure/measurer.sp"
 #include "gokz-measure/commands.sp"
@@ -46,9 +47,19 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
+	LoadTranslations("gokz-common.phrases");
 	LoadTranslations("gokz-measure.phrases");
 	
 	RegisterCommands();
+}
+
+
+
+// =====[ CLIENT EVENTS ]=====
+
+public void OnClientPutInServer(int client)
+{
+	gB_MeasureDetailed[client] = false;
 }
 
 
