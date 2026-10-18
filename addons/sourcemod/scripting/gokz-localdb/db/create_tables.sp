@@ -17,6 +17,8 @@ void DB_CreateTables()
 			txn.AddQuery(sqlite_mapcourses_create);
 			txn.AddQuery(sqlite_times_create);
 			txn.AddQuery(sqlite_jumpstats_create);
+			txn.AddQuery(sqlite_jumpstatreplays_create);
+			txn.AddQuery(sqlite_jumpstatreplays_index);
 			txn.AddQuery(sqlite_acstats_create);
 			txn.AddQuery(sqlite_playercvars_create);
 			txn.AddQuery(sqlite_playercvars_index);
@@ -30,6 +32,7 @@ void DB_CreateTables()
 			txn.AddQuery(mysql_mapcourses_create);
 			txn.AddQuery(mysql_times_create);
 			txn.AddQuery(mysql_jumpstats_create);
+			txn.AddQuery(mysql_jumpstatreplays_create);
 			txn.AddQuery(mysql_acstats_create);
 			txn.AddQuery(mysql_playercvars_create);
 			txn.AddQuery(mysql_vbpos_create);
@@ -38,4 +41,12 @@ void DB_CreateTables()
 	}
 	
 	SQL_ExecuteTransaction(gH_DB, txn, _, DB_TxnFailure_Generic, _, DBPrio_High);
+
+	// Separate transaction, as on SQLite a failure would also roll back the creates above.
+	Transaction alterTxn = SQL_CreateTransaction();
+	alterTxn.AddQuery(sql_times_alter_add_guid);
+
+	// No error logs for this transaction as it will always throw an error
+	// if the column already exists, which is more annoying than helpful.
+	SQL_ExecuteTransaction(gH_DB, alterTxn, _, _, _, DBPrio_High);
 } 

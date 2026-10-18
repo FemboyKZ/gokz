@@ -1,24 +1,19 @@
 /*
 	Lets player control the replay bot.
-
-	Each replay bot has at most one controller, who is shown the control menu
-	while watching it. Control only changes in the event handlers and
-	commands, never while drawing the menu.
 */
 
 #define ITEM_INFO_PAUSE "pause"
 #define ITEM_INFO_SKIP "skip"
 #define ITEM_INFO_REWIND "rewind"
 #define ITEM_INFO_FREECAM "freecam"
-#define ITEM_INFO_BACK_TO_BOT "backtobot"
 
-static int controllingUserId[RP_MAX_BOTS];
+static int controllingPlayer[RP_MAX_BOTS];
 static int botTeleports[RP_MAX_BOTS];
-static bool menuDrawnInFreecam[MAXPLAYERS + 1];
+static bool showReplayControls[MAXPLAYERS + 1];
 
 
 
-// =====[ EVENTS ]=====
+// =====[ PUBLIC ]=====
 
 void OnPlayerRunCmdPost_ReplayControls(int client, int cmdnum)
 {
@@ -29,56 +24,6 @@ void OnPlayerRunCmdPost_ReplayControls(int client, int cmdnum)
 	}
 }
 
-void OnBotJoined_ReplayControls(int requester, int bot)
-{
-	if (ShowControlsEnabled(requester))
-	{
-		controllingUserId[bot] = GetClientUserId(requester);
-	}
-}
-
-void OnBotDisconnect_ReplayControls(int bot)
-{
-	// A requester with Show Controls off doesn't overwrite the slot when their
-	// bot joins, so it would otherwise still name this bot's controller.
-	ReleaseReplayBot(bot);
-}
-
-void OnOptionChanged_ReplayControls(int client, const char[] option, any newValue)
-{
-	if (!StrEqual(option, gC_HUDOptionNames[HUDOption_ShowControls]) || newValue != ReplayControls_Disabled)
-	{
-		return;
-	}
-	
-	// A hidden menu would leave the player holding bots they can't use, locking
-	// out everyone else, so turning the option off gives them up.
-	for (int bot = 0; bot < RP_MAX_BOTS; bot++)
-	{
-		if (GetReplayBotController(bot) == client)
-		{
-			ReleaseReplayBot(bot);
-		}
-	}
-}
-
-
-
-// =====[ PUBLIC ]=====
-
-// Returns the client controlling the replay bot, or 0.
-int GetReplayBotController(int bot)
-{
-	return GetClientOfUserId(controllingUserId[bot]);
-}
-
-// Whether the bot's controller is currently watching it.
-static bool IsReplayBotControlled(int bot)
-{
-	int controller = GetReplayBotController(bot);
-	return controller != 0 && GetWatchedBot(controller) == bot;
-}
-
 bool UpdateReplayControlMenu(int client)
 {
 	if (!IsValidClient(client) || IsFakeClient(client))
@@ -86,25 +31,39 @@ bool UpdateReplayControlMenu(int client)
 		return false;
 	}
 	
-	int bot = GetWatchedBot(client);
-	if (bot == -1 || GetReplayBotController(bot) != client)
+	int botClient = GetObserverTarget(client);
+	int bot = GetBotFromClient(botClient);
+	if (bot == -1)
 	{
 		return false;
 	}
 	
-	// We have to update this often if bot uses teleports.
-	if (GetClientMenu(client) == MenuSource_None || 
-		GOKZ_HUD_GetMenuShowing(client) && GetClientAvgLoss(client, NetFlow_Both) > EPSILON || 
-		GOKZ_HUD_GetMenuShowing(client) && GOKZ_HUD_GetOption(client, HUDOption_TimerText) == TimerText_TPMenu ||
-		GOKZ_HUD_GetMenuShowing(client) && PlaybackGetTeleports(bot) > 0 ||
-		// The last item depends on freecam, and nothing else redraws the menu when
-		// only that changes, such as entering freecam with the spectator mode key.
-		GOKZ_HUD_GetMenuShowing(client) && menuDrawnInFreecam[client] != (GetObserverMode(client) == ObsMode_Roaming))
+	if (!IsReplayBotControlled(bot, botClient) && !InBreather(bot))
 	{
-		botTeleports[bot] = PlaybackGetTeleports(bot);
-		ShowReplayControlMenu(client, bot);
+		CancelReplayControlsForBot(bot);
+		controllingPlayer[bot] = client;
 	}
-	return true;
+	else if (controllingPlayer[bot] != client)
+	{
+		return false;
+	}
+	
+	if (showReplayControls[client] &&	
+		(!gB_GOKZHUD || GOKZ_HUD_GetOption(client, HUDOption_ShowControls) == ReplayControls_Enabled))
+	{
+		bool hudMenuShowing = gB_GOKZHUD && GOKZ_HUD_GetMenuShowing(client);
+		// We have to update this often if bot uses teleports.
+		if (GetClientMenu(client) == MenuSource_None || 
+			hudMenuShowing && GetClientAvgLoss(client, NetFlow_Both) > EPSILON || 
+			hudMenuShowing && GOKZ_HUD_GetOption(client, HUDOption_TimerText) == TimerText_TPMenu ||
+			hudMenuShowing && PlaybackGetTeleports(bot) > 0)
+		{
+			botTeleports[bot] = PlaybackGetTeleports(bot);
+			ShowReplayControlMenu(client, bot);
+		}
+		return true;
+	}
+	return false;
 }
 
 void ShowReplayControlMenu(int client, int bot)
@@ -121,7 +80,7 @@ void ShowReplayControlMenu(int client, int bot)
 			GOKZ_HUD_GetOption(client, HUDOption_SpecListPosition) == SpecListPosition_TPMenu)
 		{
 			HUDInfo info;
-			GetPlaybackState(GetClientFromBot(bot), info);
+			GetPlaybackState(client, info);
 			GOKZ_HUD_GetMenuSpectatorText(client, info, text, sizeof(text));
 		}
 		if (GOKZ_HUD_GetOption(client, HUDOption_TimerText) == TimerText_TPMenu)
@@ -164,19 +123,8 @@ void ShowReplayControlMenu(int client, int bot)
 	FormatEx(text, sizeof(text), "%T\n ", "Replay Controls - Rewind", client);
 	menu.AddItem(ITEM_INFO_REWIND, text);
 	
-	// Leaving freecam with the spectator mode key doesn't necessarily land on the
-	// bot, so freecam offers a way straight back instead.
-	menuDrawnInFreecam[client] = GetObserverMode(client) == ObsMode_Roaming;
-	if (menuDrawnInFreecam[client])
-	{
-		FormatEx(text, sizeof(text), "%T", "Replay Controls - Back To Bot", client);
-		menu.AddItem(ITEM_INFO_BACK_TO_BOT, text);
-	}
-	else
-	{
-		FormatEx(text, sizeof(text), "%T", "Replay Controls - Freecam", client);
-		menu.AddItem(ITEM_INFO_FREECAM, text);
-	}
+	FormatEx(text, sizeof(text), "%T", "Replay Controls - Freecam", client);
+	menu.AddItem(ITEM_INFO_FREECAM, text);
 	
 	menu.Display(client, MENU_TIME_FOREVER);
 
@@ -188,39 +136,31 @@ void ShowReplayControlMenu(int client, int bot)
 
 void ToggleReplayControls(int client)
 {
-	int bot = GetWatchedBot(client);
-	if (bot == -1)
+	if (showReplayControls[client])
 	{
-		GOKZ_PrintToChat(client, true, "%t", "Replay Controls - Not Spectating Bot");
-		GOKZ_PlayErrorSound(client);
-		return;
+		CancelReplayControls(client);
 	}
-	
-	if (GetReplayBotController(bot) == client)
+	else
 	{
-		ReleaseReplayBot(bot);
-		return;
+		showReplayControls[client] = true;
 	}
-	
-	// A controller who looked away shouldn't lock everyone out, so only one who's
-	// watching blocks taking the bot.
-	if (IsReplayBotControlled(bot))
-	{
-		GOKZ_PrintToChat(client, true, "%t", "Replay Controls - Bot Controlled");
-		GOKZ_PlayErrorSound(client);
-		return;
-	}
-	
-	// Asking for controls means wanting them, so this turns the option back on
-	// like other gokz toggle commands do, rather than overriding it.
-	if (!ShowControlsEnabled(client))
-	{
-		GOKZ_HUD_SetOption(client, HUDOption_ShowControls, ReplayControls_Enabled);
-	}
-	
-	controllingUserId[bot] = GetClientUserId(client);
-	botTeleports[bot] = PlaybackGetTeleports(bot);
-	ShowReplayControlMenu(client, bot);
+}
+
+void EnableReplayControls(int client)
+{
+	showReplayControls[client] = true;
+}
+
+bool IsReplayBotControlled(int bot, int botClient)
+{
+	return IsValidClient(controllingPlayer[bot]) &&
+				(GetObserverTarget(controllingPlayer[bot]) == botClient ||
+				GetEntProp(controllingPlayer[bot], Prop_Send, "m_iObserverMode") == 6);
+}
+
+int GetReplayBotController(int bot)
+{
+	return controllingPlayer[bot];
 }
 
 int MenuHandler_ReplayControls(Menu menu, MenuAction action, int param1, int param2)
@@ -234,8 +174,8 @@ int MenuHandler_ReplayControls(Menu menu, MenuAction action, int param1, int par
 				return 0;
 			}
 
-			int bot = GetWatchedBot(param1);
-			if (bot == -1 || GetReplayBotController(bot) != param1)
+			int bot = GetBotFromClient(GetObserverTarget(param1));
+			if (bot == -1 || controllingPlayer[bot] != param1)
 			{
 				return 0;
 			}
@@ -258,23 +198,20 @@ int MenuHandler_ReplayControls(Menu menu, MenuAction action, int param1, int par
 			{
 				SetEntProp(param1, Prop_Send, "m_iObserverMode", 6);
 			}
-			else if (StrEqual(info, ITEM_INFO_BACK_TO_BOT, false))
+			if (gB_GOKZHUD)
 			{
-				SpectateBot(param1, bot);
+				GOKZ_HUD_SetMenuShowing(param1, false);
 			}
-			GOKZ_HUD_SetMenuShowing(param1, false);
 		}
 		case MenuAction_Cancel:
 		{
-			GOKZ_HUD_SetMenuShowing(param1, false);
+			if (gB_GOKZHUD)
+			{
+				GOKZ_HUD_SetMenuShowing(param1, false);
+			}
 			if (param2 == MenuCancel_Exit)
 			{
-				// The menu is already closing, so release without closing it again.
-				int bot = GetWatchedBot(param1);
-				if (bot != -1 && GetReplayBotController(bot) == param1)
-				{
-					controllingUserId[bot] = 0;
-				}
+				CancelReplayControls(param1);
 			}
 		}
 		case MenuAction_End:
@@ -285,36 +222,16 @@ int MenuHandler_ReplayControls(Menu menu, MenuAction action, int param1, int par
 	return 0;
 }
 
-
-
-// =====[ PRIVATE ]=====
-
-static void ReleaseReplayBot(int bot)
+void CancelReplayControls(int client)
 {
-	int controller = GetReplayBotController(bot);
-	controllingUserId[bot] = 0;
-	if (controller != 0 && GetWatchedBot(controller) == bot)
+	if (IsValidClient(client) && showReplayControls[client])
 	{
-		ClearReplayControlMenu(controller);
+		CancelClientMenu(client);
+		showReplayControls[client] = false;
 	}
 }
 
-// Cancelling a menu only forgets it on the server, and the client keeps showing
-// it until something replaces it, so it's replaced with an empty panel instead.
-static void ClearReplayControlMenu(int client)
+void CancelReplayControlsForBot(int bot)
 {
-	Panel panel = new Panel();
-	panel.Send(client, PanelHandler_Empty, 1);
-	delete panel;
-}
-
-static int PanelHandler_Empty(Menu menu, MenuAction action, int param1, int param2)
-{
-	return 0;
-}
-
-// Without the HUD plugin the option doesn't exist, so controls are always allowed.
-static bool ShowControlsEnabled(int client)
-{
-	return !gB_GOKZHUD || GOKZ_HUD_GetOption(client, HUDOption_ShowControls) != ReplayControls_Disabled;
+	CancelReplayControls(controllingPlayer[bot]);
 }

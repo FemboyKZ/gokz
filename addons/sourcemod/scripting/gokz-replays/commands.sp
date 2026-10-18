@@ -1,16 +1,9 @@
 void RegisterCommands()
 {
-	RegConsoleCmd("sm_replay", CommandReplay, "[KZ] Open the replay loading menu.");
 	RegConsoleCmd("sm_replaycontrols", CommandReplayControls, "[KZ] Toggle the replay control menu.");
 	RegConsoleCmd("sm_rpcontrols", CommandReplayControls, "[KZ] Toggle the replay control menu.");
 	RegConsoleCmd("sm_replaygoto", CommandReplayGoto, "[KZ] Skip to a specific time in the replay (hh:mm:ss).");
 	RegConsoleCmd("sm_rpgoto", CommandReplayGoto, "[KZ] Skip to a specific time in the replay (hh:mm:ss).");
-}
-
-public Action CommandReplay(int client, int args)
-{
-	DisplayReplayModeMenu(client);
-	return Plugin_Handled;
 }
 
 public Action CommandReplayControls(int client, int args)
@@ -46,7 +39,6 @@ public Action CommandReplayGoto(int client, int args)
 		default:
 		{
 			GOKZ_PrintToChat(client, true, "%t", "Replay Controls - Invalid Time");
-			GOKZ_PlayErrorSound(client);
 			return Plugin_Handled;
 		}
 	}

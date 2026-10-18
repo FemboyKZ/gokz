@@ -8,6 +8,7 @@
 #undef REQUIRE_EXTENSIONS
 #undef REQUIRE_PLUGIN
 #include <gokz/jumpstats>
+#include <gokz/replays>
 
 #pragma newdecls required
 #pragma semicolon 1
@@ -31,6 +32,8 @@ bool gB_Cheater[MAXPLAYERS + 1];
 int gI_PBJSCache[MAXPLAYERS + 1][MODE_COUNT][JUMPTYPE_COUNT][JUMPSTATDB_CACHE_COUNT];
 bool gB_MapSetUp;
 int gI_DBCurrentMapID;
+char gC_RunGUID[MAXPLAYERS + 1][GOKZ_DB_TIME_GUID_MAX];
+int gI_RunCounter = 0;
 
 #include "gokz-localdb/api.sp"
 #include "gokz-localdb/commands.sp"
@@ -43,6 +46,7 @@ int gI_DBCurrentMapID;
 #include "gokz-localdb/db/save_js.sp"
 #include "gokz-localdb/db/save_ac.sp"
 #include "gokz-localdb/db/player_cvars.sp"
+#include "gokz-localdb/db/jumpstat_replays.sp"
 #include "gokz-localdb/db/save_time.sp"
 #include "gokz-localdb/db/set_cheater.sp"
 #include "gokz-localdb/db/setup_client.sp"
@@ -68,6 +72,7 @@ public void OnPluginStart()
 	
 	CreateGlobalForwards();
 	RegisterCommands();
+	JSReplays_OnPluginStart();
 	DB_SetupDatabase();
 }
 
@@ -110,6 +115,12 @@ public void GOKZ_DB_OnMapSetup(int mapID)
 public void OnMapEnd()
 {
 	gB_MapSetUp = false;
+	JSReplays_OnMapEnd();
+}
+
+public void OnClientConnected(int client)
+{
+	gC_RunGUID[client][0] = 0;
 }
 
 public void OnClientAuthorized(int client, const char[] auth)
@@ -164,17 +175,35 @@ public void GOKZ_OnOptionsMenuReady(TopMenu topMenu)
 	OnOptionsMenuReady_OptionsMenu(topMenu);
 }
 
+public Action GOKZ_OnTimerStart(int client, int course)
+{
+	// Initialize the run GUID.
+	// NOTE(Szwagi): It's definitely overdone.
+	// It'd be nice to use a battle tested UUID implementation but it's not feasable from SourceMod.
+	// Something like UUIDv4 looks doable but I don't trust the RNG SourceMod provides.
+	gI_RunCounter++;
+	FormatEx(gC_RunGUID[client], sizeof(gC_RunGUID[]), "%x-%x-%x-%x-%x", 
+		GetSteamAccountID(client), 
+		GetTime(), 
+		GetSysTickCount(),
+		GetURandomInt(), 
+		gI_RunCounter);
+
+	return Plugin_Continue;
+}
+
 public void GOKZ_OnTimerEnd_Post(int client, int course, float time, int teleportsUsed)
 {
 	int mode = GOKZ_GetCoreOption(client, Option_Mode);
 	int style = GOKZ_GetCoreOption(client, Option_Style);
-	DB_SaveTime(client, course, mode, style, time, teleportsUsed);
+	DB_SaveTime(client, course, mode, style, time, teleportsUsed, gC_RunGUID[client]);
 }
 
 public void GOKZ_JS_OnLanding(Jump jump)
 {
 	OnLanding_SaveJumpstat(jump);
 	OnLanding_SaveAcStats(jump);
+	JSReplays_OnLanding(jump);
 }
 
 public void GOKZ_JS_OnJumpstatAlways(Jump jump)

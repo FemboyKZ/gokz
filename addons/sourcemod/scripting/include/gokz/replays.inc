@@ -29,13 +29,6 @@ enum
 	REPLAYTYPE_COUNT
 };
 
-enum ReplaySaveState
-{
-	ReplaySave_Local = 0,
-	ReplaySave_Temp,
-	ReplaySave_Disabled
-};
-
 // NOTE: Replays use delta compression for storage.
 // This enum is the indices of the ReplayTickData enum struct.
 // NOTE: This has to match the ReplayTickData enum struct!!!
@@ -115,7 +108,7 @@ enum struct RunReplayHeader
 	int teleportsUsed;
 }
 
-// NOTE: Make sure to change the RPDELTA_* enum, TickDataToArray() and TickDataFromArray() when adding/removing stuff from this!!!
+// NOTE: Make sure to change the RPDELTA_* enum when adding/removing stuff from this!!!
 enum struct ReplayTickData
 {
 	int deltaFlags;
@@ -137,9 +130,9 @@ enum struct ReplayTickData
 
 #define RP_DIRECTORY "data/gokz-replays" // In Path_SM
 #define RP_DIRECTORY_RUNS "data/gokz-replays/_runs" // In Path_SM
-#define RP_DIRECTORY_RUNS_TEMP "data/gokz-replays/_tempRuns" // In Path_SM
 #define RP_DIRECTORY_CHEATERS "data/gokz-replays/_cheaters" // In Path_SM
 #define RP_DIRECTORY_JUMPS "data/gokz-replays/_jumps" // In Path_SM
+#define RP_DIRECTORY_JUMPSTATS "data/gokz-replays/_jumpstats" // In Path_SM
 #define RP_DIRECTORY_BLOCKJUMPS "blocks"
 #define RP_FILE_EXTENSION "replay"
 #define RP_MAGIC_NUMBER 0x676F6B7A
@@ -186,41 +179,19 @@ enum struct ReplayTickData
 // =====[ FORWARDS ]=====
 
 /**
- * Called when a replay of a player is written to disk.
- * This includes replays of cheaters which are saved if
- * the player is marked as a cheater by gokz-localdb.
+ * Called after a run replay has been written to disk.
  *
- * @param client			The client ID of the player who completed the run.
- * @param replayType		The type of the replay (Run/Jump/Cheater).
- * @param map				The name of the map the run was completed on.
- * @param course			The specific course on the map the run was completed on.
- * @param timeType			The type of time (Pro/Nub).
- * @param time				The time the run was completed in.
+ * @param client			Client index of the player who completed the run.
+ * @param replayType		Replay type (Run/Jump/Cheater).
+ * @param map				Map the run was completed on.
+ * @param course			Course the run was completed on.
+ * @param timeType			Time type (Pro/Nub).
+ * @param time				Run time.
  * @param filePath			Replay file path.
- * @param tempReplay		Whether the replay file should only be temporaily stored. 
- * @return					Plugin_Handled to take over the temporary replay deletion, Plugin_Continue to allow temporary replay deletion by the replay plugin.
+ * @param tempReplay		Always false here, present for compatibility with forks that store replays temporarily.
+ * @return					Ignored by gokz-replays.
  */
 forward Action GOKZ_RP_OnReplaySaved(int client, int replayType, const char[] map, int course, int timeType, float time, const char[] filePath, bool tempReplay);
-
-/**
- * Called when a currently being recorded replay is discarded from
- * memory and recording has been stopped (without writing it to disk).
- *
- * @param client			Client index.
- */
-forward void GOKZ_RP_OnReplayDiscarded(int client);
-
-/**
- * Called when a player has ended their timer, and gokz-replays has
- * processed the time and has possibly written a replay to disk.
- *
- * @param client			Client index.
- * @param filePath			Replay file path, or "" if no replay saved.
- * @param course    		Course number.
- * @param time				Player's end time.
- * @param teleportsUsed		Number of teleports used by player.
- */
-forward void GOKZ_RP_OnTimerEnd_Post(int client, const char[] filePath, int course, float time, int teleportsUsed);
 
 
 
@@ -240,9 +211,89 @@ native int GOKZ_RP_GetPlaybackInfo(int client, any[] info);
  *
  * @param client			Client index.
  * @param path				Path to the replay file.
- * @return					The client ID of the bot performing the replay.
+ * @param isAuto			Whether the bot loops its replay and is never auto-kicked.
+ * @return					Bot slot playing the replay, or -1 on failure.
  */
-native int GOKZ_RP_LoadJumpReplay(int client, char[] path);
+native int GOKZ_RP_LoadJumpReplay(int client, const char[] path, bool isAuto = false);
+
+/**
+ * Gets the client index of a replay bot.
+ *
+ * @param bot				Bot slot.
+ * @return					Client index, 0 until the bot has joined, or -1 if the slot is invalid.
+ */
+native int GOKZ_RP_GetClientFromBot(int bot);
+
+/**
+ * Gets the bot slot a client is replaying on.
+ *
+ * @param client			Client index.
+ * @return					Bot slot, or -1 if the client isn't a replay bot.
+ */
+native int GOKZ_RP_GetBotSlotFromClient(int client);
+
+/**
+ * Sets whether a bot loops its replay and survives having no spectators.
+ *
+ * @param bot				Bot slot.
+ * @param isAuto			Auto state.
+ * @return					True if the bot slot is valid.
+ */
+native bool GOKZ_RP_SetBotIsAuto(int bot, bool isAuto);
+
+/**
+ * Kicks a replay bot and frees its slot.
+ * Use this rather than KickClient, which leaves bot_quota raised
+ * so the bot manager spawns an idle replacement.
+ *
+ * @param bot				Bot slot.
+ * @return					True if a bot was kicked.
+ */
+native bool GOKZ_RP_KickBot(int bot);
+
+/**
+ * Freezes a replay bot on its current tick.
+ *
+ * @param bot				Bot slot.
+ * @return					True if the bot slot is valid.
+ */
+native bool GOKZ_RP_Pause(int bot);
+
+/**
+ * Unfreezes a replay bot.
+ *
+ * @param bot				Bot slot.
+ * @return					True if the bot slot is valid.
+ */
+native bool GOKZ_RP_Resume(int bot);
+
+/**
+ * Jumps replay playback to a specific tick.
+ *
+ * @param bot				Bot slot.
+ * @param tick				Tick to move to.
+ * @return					True if the bot slot and tick are valid.
+ */
+native bool GOKZ_RP_SkipToTick(int bot, int tick);
+
+/**
+ * Gets the number of ticks in a bot's loaded replay.
+ *
+ * @param bot				Bot slot.
+ * @return					Tick count, or 0 if nothing is loaded.
+ */
+native int GOKZ_RP_GetTickCount(int bot);
+
+/**
+ * Reads one tick of a bot's loaded replay, indexed by the RPDELTA_* enum.
+ * Version 1 replays only fill in origin, angles and flags.
+ *
+ * @param bot				Bot slot.
+ * @param tick				Tick to read.
+ * @param output			Array to receive the tick data.
+ * @return					True if the tick was read.
+ */
+native bool GOKZ_RP_GetTickData(int bot, int tick, any output[RP_V2_TICK_DATA_BLOCKSIZE]);
 
 /**
  * Called by the HUD to show the replay control menu.
@@ -250,6 +301,49 @@ native int GOKZ_RP_LoadJumpReplay(int client, char[] path);
  * @param client			Client index.
  */
 native bool GOKZ_RP_UpdateReplayControlMenu(int client);
+
+/**
+ * Records the player's recent buffer as a standalone jumpstat replay,
+ * written to RP_DIRECTORY_JUMPSTATS/<guid>.replay after the post-jump breather.
+ *
+ * @param client			Client index.
+ * @param guid				Unique id used as the filename (no extension).
+ * @param mode				Mode index.
+ * @param style				Style index.
+ * @param jumpType			Jump type.
+ * @param distance			Jump distance.
+ * @param block				Block distance (0 if not a block jump).
+ * @param strafes			Strafe count.
+ * @param sync				Sync.
+ * @param pre				Prespeed.
+ * @param max				Max speed.
+ * @param airtime			Airtime (seconds * GOKZ_DB_JS_AIRTIME_PRECISION).
+ * @return					True if the save was scheduled.
+ */
+native bool GOKZ_RP_SaveJumpStatReplay(int client, const char[] guid, int mode, int style, int jumpType, float distance, int block, int strafes, float sync, float pre, float max, int airtime);
+
+
+
+// =====[ STOCKS ]=====
+
+stock void GOKZ_RP_FormatRunReplayPath(char[] buffer, int maxlength, const char[] guid)
+{
+	BuildPath(Path_SM, buffer, maxlength,
+		"%s/%s.%s",
+		RP_DIRECTORY_RUNS,
+		guid,
+		RP_FILE_EXTENSION);
+}
+
+stock void GOKZ_RP_FormatJumpStatReplayPath(char[] buffer, int maxlength, const char[] guid)
+{
+	BuildPath(Path_SM, buffer, maxlength,
+		"%s/%s.%s",
+		RP_DIRECTORY_JUMPSTATS,
+		guid,
+		RP_FILE_EXTENSION);
+}
+
 
 
 // =====[ DEPENDENCY ]=====
@@ -271,5 +365,15 @@ public void __pl_gokz_replays_SetNTVOptional()
 	MarkNativeAsOptional("GOKZ_RP_GetPlaybackInfo");
 	MarkNativeAsOptional("GOKZ_RP_LoadJumpReplay");
 	MarkNativeAsOptional("GOKZ_RP_UpdateReplayControlMenu");
+	MarkNativeAsOptional("GOKZ_RP_SaveJumpStatReplay");
+	MarkNativeAsOptional("GOKZ_RP_GetClientFromBot");
+	MarkNativeAsOptional("GOKZ_RP_GetBotSlotFromClient");
+	MarkNativeAsOptional("GOKZ_RP_SetBotIsAuto");
+	MarkNativeAsOptional("GOKZ_RP_KickBot");
+	MarkNativeAsOptional("GOKZ_RP_Pause");
+	MarkNativeAsOptional("GOKZ_RP_Resume");
+	MarkNativeAsOptional("GOKZ_RP_SkipToTick");
+	MarkNativeAsOptional("GOKZ_RP_GetTickCount");
+	MarkNativeAsOptional("GOKZ_RP_GetTickData");
 }
 #endif

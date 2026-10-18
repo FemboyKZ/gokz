@@ -15,13 +15,11 @@ static ArrayList playbackTickData[RP_MAX_BOTS];
 static bool inBreather[RP_MAX_BOTS];
 static float breatherStartTime[RP_MAX_BOTS];
 
-// Userid of the original bot caller, needed for OnClientPutInServer callback
-static int botCallerUserId[RP_MAX_BOTS];
+// Original bot caller, needed for OnClientPutInServer callback
+static int botCaller[RP_MAX_BOTS];
 // Original bot name after creation by bot_add, needed for bot removal
 static char botName[RP_MAX_BOTS][MAX_NAME_LENGTH];
 static bool botInGame[RP_MAX_BOTS];
-// Freecam has no target, so the last replay bot each player spectated stands in for it
-static int lastSpectatedBot[MAXPLAYERS + 1];
 static int botClient[RP_MAX_BOTS];
 static bool botDataLoaded[RP_MAX_BOTS];
 static int botReplayType[RP_MAX_BOTS];
@@ -57,15 +55,21 @@ static bool botIsTakeoff[RP_MAX_BOTS];
 static bool botJustTeleported[RP_MAX_BOTS];
 static float botLandingSpeed[RP_MAX_BOTS];
 
+static bool botAuto[RP_MAX_BOTS];
+static bool botAbandoned[RP_MAX_BOTS];
+static bool botPending[RP_MAX_BOTS];
+static Handle botPendingTimer[RP_MAX_BOTS];
+#define RP_BOT_PENDING_TIMEOUT 10.0
+
 
 
 // =====[ PUBLIC ]=====
 
-// Returns the client index of the replay bot, or -1 otherwise
-int LoadReplayBot(int client, char[] path)
+// Returns the bot slot of the replay bot, or -1 otherwise
+int LoadReplayBot(int client, const char[] path, bool isAuto = false)
 {
-	// Safeguard Check
-	if (GOKZ_GetCoreOption(client, Option_Safeguard) > Safeguard_Disabled && GOKZ_GetTimerRunning(client) && GOKZ_GetValidTimer(client))
+	// Safeguard Check, skipped for auto bots since they never spectate the caller
+	if (!isAuto && GOKZ_GetCoreOption(client, Option_Safeguard) > Safeguard_Disabled && GOKZ_GetTimerRunning(client) && GOKZ_GetValidTimer(client))
 	{
 		if (!GOKZ_GetPaused(client) && !GOKZ_GetCanPause(client))
 		{
@@ -81,8 +85,12 @@ int LoadReplayBot(int client, char[] path)
 	}
 	else
 	{
-		GOKZ_PrintToChat(client, true, "%t", "No Bots Available");
-		GOKZ_PlayErrorSound(client);
+		// Nobody asked for an auto bot, so don't bother the client we borrowed
+		if (!isAuto)
+		{
+			GOKZ_PrintToChat(client, true, "%t", "No Bots Available");
+			GOKZ_PlayErrorSound(client);
+		}
 		return -1;
 	}
 	
@@ -90,47 +98,79 @@ int LoadReplayBot(int client, char[] path)
 	{
 		LogError("Unused bot could not be found even though only %d out of %d are known to be in use.", 
 				 GetBotsInUse(), RP_MAX_BOTS);
-		GOKZ_PlayErrorSound(client);
+		if (!isAuto)
+		{
+			GOKZ_PlayErrorSound(client);
+		}
 		return -1;
 	}
 
-	if (GetClientCount(false) >= MaxClients)
+	if (!LoadPlayback(client, bot, path, isAuto))
 	{
-		GOKZ_PrintToChat(client, true, "%t", "Server Full");
-		GOKZ_PlayErrorSound(client);
-		return -1;
-	}
-
-	if (!LoadPlayback(client, bot, path))
-	{
-		GOKZ_PlayErrorSound(client);
+		if (!isAuto)
+		{
+			GOKZ_PlayErrorSound(client);
+		}
 		return -1;
 	}
 	
-	botCallerUserId[bot] = GetClientUserId(client);
-	// bot_add joins the bot synchronously once executed, so flushing the command
-	// buffer lets it claim this slot before another request can pick it.
 	ServerCommand("bot_add");
-	ServerExecute();
-	if (!botInGame[bot])
+	botCaller[bot] = client;
+	botAuto[bot] = isAuto;
+	botAbandoned[bot] = false;
+	ReservePendingBot(bot);
+	return bot;
+}
+
+// Holds the slot until bot_add answers, so a second load can't be handed the same one
+static void ReservePendingBot(int bot)
+{
+	ClearPendingBot(bot);
+	botPending[bot] = true;
+	botPendingTimer[bot] = CreateTimer(RP_BOT_PENDING_TIMEOUT, Timer_PendingBotTimedOut, bot);
+}
+
+static void ClearPendingBot(int bot)
+{
+	botPending[bot] = false;
+	if (botPendingTimer[bot] != null)
 	{
-		botCallerUserId[bot] = 0;
-		LogError("bot_add did not add a replay bot.");
-		GOKZ_PrintToChat(client, true, "%t", "Bot Add Failed");
-		GOKZ_PlayErrorSound(client);
-		return -1;
+		KillTimer(botPendingTimer[bot]);
+		botPendingTimer[bot] = null;
 	}
-	return botClient[bot];
+}
+
+public Action Timer_PendingBotTimedOut(Handle timer, int bot)
+{
+	botPendingTimer[bot] = null;
+	if (!botPending[bot])
+	{
+		return Plugin_Stop;
+	}
+
+	// bot_add never produced a client, so free the slot rather than losing it
+	botPending[bot] = false;
+	botAbandoned[bot] = false;
+	botCaller[bot] = 0;
+	botAuto[bot] = false;
+	if (playbackTickData[bot] != null)
+	{
+		playbackTickData[bot].Clear();
+	}
+	botDataLoaded[bot] = false;
+	LogError("Replay bot slot %d timed out waiting for bot_add.", bot);
+	return Plugin_Stop;
 }
 
 // Passes the current state of the replay into the HUDInfo struct
 void GetPlaybackState(int client, HUDInfo info)
 {
-	int bot = GetBotFromClient(client);
-	if (bot == -1)
+	int bot, i;
+	for(i = 0; i < RP_MAX_BOTS; i++)
 	{
-		return;
+		bot = botClient[i] == client ? i : bot;
 	}
+	if (i == RP_MAX_BOTS + 1) return;
 	
 	if (playbackTickData[bot] == INVALID_HANDLE)
 	{
@@ -175,33 +215,119 @@ void GetPlaybackState(int client, HUDInfo info)
 	info.CurrentTeleport = botCurrentTeleport[bot];
 }
 
-// Returns the replay bot slot the client is spectating, or -1. In freecam, this
-// is the last replay bot they spectated.
-int GetWatchedBot(int client)
-{
-	if (GetObserverMode(client) == ObsMode_Roaming)
-	{
-		return lastSpectatedBot[client];
-	}
-	return GetBotFromClient(GetObserverTarget(client));
-}
-
-// Whether any player is spectating the replay bot, including in freecam.
-bool IsReplayBotWatched(int bot)
-{
-	for (int client = 1; client <= MaxClients; client++)
-	{
-		if (IsValidClient(client) && !IsFakeClient(client) && GetWatchedBot(client) == bot)
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
 int GetClientFromBot(int bot)
 {
+	// 0 until the bot has actually joined
 	return botClient[bot];
+}
+
+void SetBotIsAuto(int bot, bool isAuto)
+{
+	botAuto[bot] = isAuto;
+	// The caller is releasing a slot whose bot hasn't joined yet
+	if (!isAuto && !botInGame[bot] && botDataLoaded[bot])
+	{
+		botAbandoned[bot] = true;
+	}
+}
+
+int GetPlaybackTickCount(int bot)
+{
+	if (playbackTickData[bot] == null)
+	{
+		return 0;
+	}
+	return playbackTickData[bot].Length;
+}
+
+// A bot is only addressable once bot_add has actually produced its client
+bool IsPlaybackReady(int bot)
+{
+	return botDataLoaded[bot] && IsValidClient(botClient[bot]);
+}
+
+// bot_kick lowers the bot_quota that bot_add raised, and matches the profile name captured at join.
+//  KickClient leaves the quota high and the manager spawns a replacement.
+bool KickReplayBot(int bot)
+{
+	if (!botInGame[bot] || botName[bot][0] == '\0')
+	{
+		return false;
+	}
+
+	if (playbackTickData[bot] != null)
+	{
+		playbackTickData[bot].Clear();
+	}
+	botDataLoaded[bot] = false;
+	botAuto[bot] = false;
+	CancelReplayControlsForBot(bot);
+	ServerCommand("bot_kick %s", botName[bot]);
+	return true;
+}
+
+void PlaybackPause(int bot)
+{
+	botPlaybackPaused[bot] = true;
+}
+
+void PlaybackResume(int bot)
+{
+	botPlaybackPaused[bot] = false;
+}
+
+// Copies one tick of playback into the flat RPDELTA_* layout
+bool GetReplayTickData(int bot, int tick, any output[RP_V2_TICK_DATA_BLOCKSIZE])
+{
+	if (playbackTickData[bot] == null || tick < 0 || tick >= playbackTickData[bot].Length)
+	{
+		return false;
+	}
+
+	if (botReplayVersion[bot] == 2)
+	{
+		ReplayTickData tickData;
+		playbackTickData[bot].GetArray(tick, tickData);
+		output[RPDELTA_DELTAFLAGS] = tickData.deltaFlags;
+		output[RPDELTA_DELTAFLAGS2] = tickData.deltaFlags2;
+		output[RPDELTA_VEL_X] = tickData.vel[0];
+		output[RPDELTA_VEL_Y] = tickData.vel[1];
+		output[RPDELTA_VEL_Z] = tickData.vel[2];
+		output[RPDELTA_MOUSE_X] = tickData.mouse[0];
+		output[RPDELTA_MOUSE_Y] = tickData.mouse[1];
+		output[RPDELTA_ORIGIN_X] = tickData.origin[0];
+		output[RPDELTA_ORIGIN_Y] = tickData.origin[1];
+		output[RPDELTA_ORIGIN_Z] = tickData.origin[2];
+		output[RPDELTA_ANGLES_X] = tickData.angles[0];
+		output[RPDELTA_ANGLES_Y] = tickData.angles[1];
+		output[RPDELTA_ANGLES_Z] = tickData.angles[2];
+		output[RPDELTA_VELOCITY_X] = tickData.velocity[0];
+		output[RPDELTA_VELOCITY_Y] = tickData.velocity[1];
+		output[RPDELTA_VELOCITY_Z] = tickData.velocity[2];
+		output[RPDELTA_FLAGS] = tickData.flags;
+		output[RPDELTA_PACKETSPERSECOND] = tickData.packetsPerSecond;
+		output[RPDELTA_LAGGEDMOVEMENTVALUE] = tickData.laggedMovementValue;
+		output[RPDELTA_BUTTONSFORCED] = tickData.buttonsForced;
+		return true;
+	}
+
+	if (botReplayVersion[bot] == 1)
+	{
+		// Version 1 only stores origin, angles and flags
+		for (int i = 0; i < RP_V2_TICK_DATA_BLOCKSIZE; i++)
+		{
+			output[i] = 0;
+		}
+		output[RPDELTA_ORIGIN_X] = playbackTickData[bot].Get(tick, 0);
+		output[RPDELTA_ORIGIN_Y] = playbackTickData[bot].Get(tick, 1);
+		output[RPDELTA_ORIGIN_Z] = playbackTickData[bot].Get(tick, 2);
+		output[RPDELTA_ANGLES_X] = playbackTickData[bot].Get(tick, 3);
+		output[RPDELTA_ANGLES_Y] = playbackTickData[bot].Get(tick, 4);
+		output[RPDELTA_FLAGS] = playbackTickData[bot].Get(tick, 6);
+		return true;
+	}
+
+	return false;
 }
 
 int GetBotFromClient(int client)
@@ -214,6 +340,11 @@ int GetBotFromClient(int client)
 		}
 	}
 	return -1;
+}
+
+bool InBreather(int bot)
+{
+	return inBreather[bot];
 }
 
 bool PlaybackPaused(int bot)
@@ -265,7 +396,7 @@ void TrySkipToTime(int client, int seconds)
 		return;
 	}
 	
-	int bot = GetWatchedBot(client);
+	int bot = GetBotFromClient(GetObserverTarget(client));
 	if (bot == -1)
 	{
 		GOKZ_PrintToChat(client, true, "%t", "Replay Controls - Not Spectating Bot");
@@ -288,10 +419,9 @@ void TrySkipToTime(int client, int seconds)
 	else
 	{
 		GOKZ_PrintToChat(client, true, "%t", "Replay Controls - Invalid Time");
-		GOKZ_PlayErrorSound(client);
 	}
 }
-
+	
 float GetPlaybackTime(int bot)
 {
 	if (playbackTick[bot] < preAndPostRunTickCount)
@@ -316,8 +446,6 @@ float GetPlaybackTime(int bot)
 
 void OnClientPutInServer_Playback(int client)
 {
-	lastSpectatedBot[client] = -1;
-	
 	if (!IsFakeClient(client) || IsClientSourceTV(client))
 	{
 		return;
@@ -327,20 +455,24 @@ void OnClientPutInServer_Playback(int client)
 	for (int bot; bot < RP_MAX_BOTS; bot++)
 	{
 		// Also check if the bot was created by us.
-		if (!botInGame[bot] && botCallerUserId[bot] != 0)
+		if (!botInGame[bot] && botPending[bot])
 		{
+			ClearPendingBot(bot);
 			botInGame[bot] = true;
 			botClient[bot] = client;
 			GetClientName(client, botName[bot], sizeof(botName[]));
+			if (botAbandoned[bot])
+			{
+				DiscardAbandonedBot(bot);
+				break;
+			}
 			// The bot won't receive its weapons properly if we don't wait a frame
 			RequestFrame(SetBotStuff, bot);
-			int caller = GetClientOfUserId(botCallerUserId[bot]);
-			if (IsValidClient(caller))
+			if (IsValidClient(botCaller[bot]) && !botAuto[bot])
 			{
-				MakePlayerSpectate(caller, bot);
-				OnBotJoined_ReplayControls(caller, bot);
+				MakePlayerSpectate(botCaller[bot], botClient[bot]);
+				botCaller[bot] = 0;
 			}
-			botCallerUserId[bot] = 0;
 			break;
 		}
 	}
@@ -356,15 +488,12 @@ void OnClientDisconnect_Playback(int client)
 		}
 		
 		botInGame[bot] = false;
-		// Controls needs to see who is still watching the bot before that's cleared.
-		OnBotDisconnect_ReplayControls(bot);
-		for (int spec = 1; spec <= MaxClients; spec++)
-		{
-			if (lastSpectatedBot[spec] == bot)
-			{
-				lastSpectatedBot[spec] = -1;
-			}
-		}
+		botAuto[bot] = false;
+		botAbandoned[bot] = false;
+		ClearPendingBot(bot);
+		// Stale ids would make GetBotFromClient claim a slot for a reused client index
+		botClient[bot] = 0;
+		botCaller[bot] = 0;
 		if (playbackTickData[bot] != null)
 		{
 			playbackTickData[bot].Clear(); // Clear it all out
@@ -399,11 +528,6 @@ void OnPlayerRunCmd_Playback(int client, int &buttons, float vel[3], float angle
 
 void OnPlayerRunCmdPost_Playback(int client)
 {
-	if (!IsFakeClient(client) && GetObserverMode(client) != ObsMode_Roaming)
-	{
-		lastSpectatedBot[client] = GetBotFromClient(GetObserverTarget(client));
-	}
-	
 	for (int bot; bot < RP_MAX_BOTS; bot++)
 	{
 		// Check if not the bot we're looking for
@@ -433,16 +557,37 @@ void GOKZ_OnOptionsLoaded_Playback(int client)
 }
 // =====[ PRIVATE ]=====
 
+// Spectating the caller onto a bot they already gave up on would yank them into spectator
+static void DiscardAbandonedBot(int bot)
+{
+	botAbandoned[bot] = false;
+	botCaller[bot] = 0;
+	if (playbackTickData[bot] != null)
+	{
+		playbackTickData[bot].Clear();
+	}
+	botDataLoaded[bot] = false;
+	ServerCommand("bot_kick %s", botName[bot]);
+}
+
 // Returns false if there was a problem loading the playback e.g. doesn't exist
-static bool LoadPlayback(int client, int bot, char[] path)
+static bool LoadPlayback(int client, int bot, const char[] path, bool quiet = false)
 {
 	if (!FileExists(path))
 	{
-		GOKZ_PrintToChat(client, true, "%t", "No Replay Found");
+		if (!quiet)
+		{
+			GOKZ_PrintToChat(client, true, "%t", "No Replay Found");
+		}
 		return false;
 	}
 
 	File file = OpenFile(path, "rb");
+	if (file == null)
+	{
+		LogError("Failed to open replay file: \"%s\".", path);
+		return false;
+	}
 	
 	// Check magic number in header
 	int magicNumber;
@@ -765,26 +910,25 @@ static bool LoadFormatVersion2Replay(File file, int client, int bot)
 	
 	// Read tick data
 	preAndPostRunTickCount = RoundToZero(RP_PLAYBACK_BREATHER_TIME / GetTickInterval());
-	any tickDataArray[RP_V2_TICK_DATA_BLOCKSIZE];
+	any tickData[RP_V2_TICK_DATA_BLOCKSIZE];
 	for (int i = 0; i < tickCount; i++)
 	{
-		file.ReadInt32(tickDataArray[RPDELTA_DELTAFLAGS]);
+		file.ReadInt32(tickData[RPDELTA_DELTAFLAGS]);
 		
-		for (int index = 1; index < sizeof(tickDataArray); index++)
+		for (int index = 1; index < sizeof(tickData); index++)
 		{
 			int currentFlag = (1 << index);
-			if (tickDataArray[RPDELTA_DELTAFLAGS] & currentFlag)
+			if (tickData[RPDELTA_DELTAFLAGS] & currentFlag)
 			{
-				file.ReadInt32(tickDataArray[index]);
+				file.ReadInt32(tickData[index]);
 			}
 		}
 		
-		ReplayTickData tickData;
-		TickDataFromArray(tickDataArray, tickData);
 		// HACK: Jump replays don't record proper length sometimes. I don't know why.
 		//		 This leads to oversized replays full of 0s at the end.
 		// 		 So, we do this horrible check to dodge that issue.
-		if (tickData.origin[0] == 0 && tickData.origin[1] == 0 && tickData.origin[2] == 0 && tickData.angles[0] == 0 && tickData.angles[1] == 0)
+		if (tickData[RPDELTA_ORIGIN_X] == 0 && tickData[RPDELTA_ORIGIN_Y] == 0 && tickData[RPDELTA_ORIGIN_Z] == 0 
+			&& tickData[RPDELTA_ANGLES_X] == 0 && tickData[RPDELTA_ANGLES_Y] == 0)
 		{
 			break;
 		}
@@ -828,9 +972,17 @@ static void PlaybackVersion1(int client, int bot, int &buttons)
 		}
 		else if (GetEngineTime() > breatherStartTime[bot] + RP_PLAYBACK_BREATHER_TIME)
 		{
+			if (botAuto[bot] && botPlaybackPaused[bot])
+			{
+				return;
+			}
+
 			// End the breather period
 			inBreather[bot] = false;
-			botPlaybackPaused[bot] = false;
+			if (!botAuto[bot])
+			{
+				botPlaybackPaused[bot] = false;
+			}
 			if (playbackTick[bot] == 0)
 			{
 				GOKZ_EmitSoundToClientSpectators(client, gC_ModeStartSounds[GOKZ_GetCoreOption(client, Option_Mode)], _, "Timer Start");
@@ -839,18 +991,38 @@ static void PlaybackVersion1(int client, int bot, int &buttons)
 			playbackTick[bot]++;
 			if (playbackTick[bot] == size)
 			{
-				playbackTickData[bot].Clear(); // Clear it all out
-				botDataLoaded[bot] = false;
-				ServerCommand("bot_kick %s", botName[bot]);
+				if (botAuto[bot])
+				{
+					playbackTick[bot] = 0;
+					inBreather[bot] = false;
+					breatherStartTime[bot] = 0.0;
+				}
+				else
+				{
+					playbackTickData[bot].Clear(); // Clear it all out
+					botDataLoaded[bot] = false;
+					CancelReplayControlsForBot(bot);
+					ServerCommand("bot_kick %s", botName[bot]);
+				}
 			}
 		}
 	}
 	else
 	{
-		if (!IsReplayBotWatched(bot))
+		// Check whether somebody is actually spectating the bot
+		int spec;
+		for (spec = 1; spec < MAXPLAYERS + 1; spec++)
+		{
+			if (IsValidClient(spec) && GetObserverTarget(spec) == botClient[bot])
+			{
+				break;
+			}
+		}
+		if (spec == MAXPLAYERS + 1 && !botAuto[bot] && !IsReplayBotControlled(bot, botClient[bot]))
 		{
 			playbackTickData[bot].Clear();
 			botDataLoaded[bot] = false;
+			CancelReplayControlsForBot(bot);
 			ServerCommand("bot_kick %s", botName[bot]);
 			return;
 		}
@@ -986,26 +1158,54 @@ void PlaybackVersion2(int client, int bot, int &buttons, float vel[3], float ang
 		}
 		else if (GetEngineTime() > breatherStartTime[bot] + RP_PLAYBACK_BREATHER_TIME)
 		{
+			if (botAuto[bot] && botPlaybackPaused[bot])
+			{
+				return;
+			}
+
 			// End the breather period
 			inBreather[bot] = false;
-			botPlaybackPaused[bot] = false;
+			if (!botAuto[bot])
+			{
+				botPlaybackPaused[bot] = false;
+			}
 
 			// Start the bot if first tick. Clear bot if last tick.
 			playbackTick[bot]++;
 			if (playbackTick[bot] == size)
 			{
-				playbackTickData[bot].Clear(); // Clear it all out
-				botDataLoaded[bot] = false;
-				ServerCommand("bot_kick %s", botName[bot]);
+				if (botAuto[bot])
+				{
+					playbackTick[bot] = 0;
+					inBreather[bot] = false;
+					breatherStartTime[bot] = 0.0;
+				}
+				else
+				{
+					playbackTickData[bot].Clear(); // Clear it all out
+					botDataLoaded[bot] = false;
+					CancelReplayControlsForBot(bot);
+					ServerCommand("bot_kick %s", botName[bot]);
+				}
 			}
 		}
 	}
 	else
 	{
-		if (!IsReplayBotWatched(bot))
+		// Check whether somebody is actually spectating the bot
+		int spec;
+		for (spec = 1; spec < MAXPLAYERS + 1; spec++)
+		{
+			if (IsValidClient(spec) && GetObserverTarget(spec) == botClient[bot])
+			{
+				break;
+			}
+		}
+		if (spec == MAXPLAYERS + 1 && !botAuto[bot] && !IsReplayBotControlled(bot, botClient[bot]))
 		{
 			playbackTickData[bot].Clear();
 			botDataLoaded[bot] = false;
+			CancelReplayControlsForBot(bot);
 			ServerCommand("bot_kick %s", botName[bot]);
 			return;
 		}
@@ -1409,9 +1609,12 @@ static void SetBotName(int bot)
 
 	if (botReplayType[bot] == ReplayType_Run)
 	{
+		// Convert to database format and back so the formatting is consistent...
+		float time = GOKZ_DB_TimeIntToFloat(GOKZ_DB_TimeFloatToInt(botTime[bot]));
+
 		// DanZay (01:23.45)
 		FormatEx(name, sizeof(name), "%s (%s)", 
-			botAlias[bot], GOKZ_FormatTime(botTime[bot]));
+			botAlias[bot], GOKZ_FormatTime(time));
 	}
 	else if (botReplayType[bot] == ReplayType_Jump)
 	{
@@ -1445,7 +1648,7 @@ static int GetBotsInUse()
 	int botsInUse = 0;
 	for (int bot; bot < RP_MAX_BOTS; bot++)
 	{
-		if (botInGame[bot] && botDataLoaded[bot])
+		if (botPending[bot] || (botInGame[bot] && botDataLoaded[bot]))
 		{
 			botsInUse++;
 		}
@@ -1458,7 +1661,7 @@ static int GetUnusedBot()
 {
 	for (int bot = 0; bot < RP_MAX_BOTS; bot++)
 	{
-		if (!botInGame[bot])
+		if (!botInGame[bot] && !botPending[bot])
 		{
 			return bot;
 		}
@@ -1466,7 +1669,7 @@ static int GetUnusedBot()
 	return -1;
 }
 
-static void PlaybackSkipToTick(int bot, int tick)
+void PlaybackSkipToTick(int bot, int tick)
 {
 	if (botReplayVersion[bot] == 1)
 	{
@@ -1491,8 +1694,7 @@ static void PlaybackSkipToTick(int bot, int tick)
 		int direction = tick < playbackTick[bot] ? -1 : 1;
 		for (int i = playbackTick[bot]; i != tick; i += direction)
 		{
-			playbackTickData[bot].GetArray(i, currentTickData);
-			if (currentTickData.flags & RP_TELEPORT_TICK)
+			if (playbackTickData[bot].Get(i, RPDELTA_FLAGS) & RP_TELEPORT_TICK)
 			{
 				botCurrentTeleport[bot] += direction;
 			}
@@ -1543,15 +1745,15 @@ static bool IsCurrentWeaponSecondary(int client)
 static void MakePlayerSpectate(int client, int bot)
 {
 	GOKZ_JoinTeam(client, CS_TEAM_SPECTATOR);
-	SpectateBot(client, bot);
-}
-
-void SpectateBot(int client, int bot)
-{
 	SetEntProp(client, Prop_Send, "m_iObserverMode", 4);
-	SetEntPropEnt(client, Prop_Send, "m_hObserverTarget", botClient[bot]);
-	
-	CreateTimer(0.1, Timer_UpdateBotName, GetClientUserId(botClient[bot]));
+	SetEntPropEnt(client, Prop_Send, "m_hObserverTarget", bot);
+		
+	int clientUserID = GetClientUserId(client);
+	DataPack data = new DataPack();
+	data.WriteCell(clientUserID);
+	data.WriteCell(GetClientUserId(bot));
+	CreateTimer(0.1, Timer_UpdateBotName, GetClientUserId(bot));
+	EnableReplayControls(client);
 }
 
 public Action Timer_UpdateBotName(Handle timer, int botUID)
