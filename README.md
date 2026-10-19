@@ -6,52 +6,57 @@ GOKZ is a package of [SourceMod](https://www.sourcemod.net/about.php) plugins fo
 
 ## FKZ Changes
 
-* Syncable replays v2 from [HoC fork (syncable-replays-v2)](https://github.com/hoc-kz/gokz/).
-* Separated USP-S and P2000 from [AXE fork (pistol-menu-split)](https://github.com/cinyan10/gokz).
-* Fix changing pistol midair to disable switchteam bug (This could be fixed better).
-* Fix headhitter jumpstats registering (ported from cs2kz).
-* Make gokz-global module optional for gokz-profile functionality.
-* Added FKZ Specific VIP Role tags to gokz-profile.
-* Optional detailed output for gokz-measure commands.
+- Syncable replays v2 from [HoC fork (syncable-replays-v2)](https://github.com/hoc-kz/gokz/), replacing the stock replay system. Replays are no longer uploaded to the GlobalAPI.
+- Jumpstat replays: every valid jumpstat is recorded, keeping the best `gokz_js_replays_max` (30) per player.
+- PB replays with `!pbreplay` and `!bpbreplay`.
+- Replay natives for other plugins, e.g. `GOKZ_RP_KickBot` and `GOKZ_LR_GetRecordReplayPath` for gokz-lead.
+- Jumpbug-aware bhop tracking in gokz-anticheat (`!bhopcheck_fkz`), for local and SourceBans++ bans only, alongside the original global one.
+- Anticheat strafe metrics on jumpstats and player cvar tracking, saved to the database.
+- FKZ VIP role tags in gokz-profile, and gokz-profile works without gokz-global.
+- Optional detailed output for gokz-measure (`!measuredetailed`).
+- Smaller fixes, e.g. dropping `ON UPDATE CASCADE` from the database tables, bounds checks on the PB cache and a broken jumpstat top query.
+- Newer GlobalAPI, SteamWorks and MovementAPI includes.
 
 ### Modified plugins
 
 ```txt
+gokz-anticheat
+gokz-core
+gokz-global
 gokz-jumpbeam
 gokz-jumpstats
 gokz-localdb
 gokz-localranks
 gokz-measure
-gokz-pistol
 gokz-profile
+gokz-quiet
+gokz-racing
 gokz-replays
 ```
 
 ### Modified translations
 
 ```txt
-gokz-jumpstats
-gokz-jumpbeam
 gokz-localranks
 gokz-measure
-gokz-pistol
 gokz-profile
+gokz-replays
 ```
 
 ## Features
 
- * **Timer** - Times runs by automatically detecting the use of start and end buttons in KZ maps.
- * **Movement Modes** - Custom movement mechanics. Includes Vanilla, SimpleKZ, and KZTimer modes.
-    * Mode plugins can be used alone (with only MovementAPI) to apply their mechanics at all times.
- * **Jumpstats** - Detailed statistics of your jumps and each individual air strafe.
- * **In-game Options** - Tonnes of options for players, providing them the best possible experience.
- * **Replays** - Record replays of the server's fastest times and use bots to play them back.
- * **Anti-Cheat** - Detect and auto-ban blatant users of bhop macros and cheats (SourceBans++ supported).
- * **Database Support** - Store run times and more using either a MySQL or SQLite database. 
-    * Player options are stored using the clientprefs extension.
- * **GlobalAPI Support** - Submit run times to the GlobalAPI so that players may compete across servers.
- * **Extensive Plugin API** - With forwards, natives, and modularity at its core, GOKZ is highly extensible.
- * Map bonus support, HUD, teleport menu, noclip, !goto, !measure, !race and much, much more.
+- **Timer** - Times runs by automatically detecting the use of start and end buttons in KZ maps.
+- **Movement Modes** - Custom movement mechanics. Includes Vanilla, SimpleKZ, and KZTimer modes.
+  - Mode plugins can be used alone (with only MovementAPI) to apply their mechanics at all times.
+- **Jumpstats** - Detailed statistics of your jumps and each individual air strafe.
+- **In-game Options** - Tonnes of options for players, providing them the best possible experience.
+- **Replays** - Record replays of the server's fastest times and use bots to play them back.
+- **Anti-Cheat** - Detect and auto-ban blatant users of bhop macros and cheats (SourceBans++ supported).
+- **Database Support** - Store run times and more using either a MySQL or SQLite database.
+  - Player options are stored using the clientprefs extension.
+- **GlobalAPI Support** - Submit run times to the GlobalAPI so that players may compete across servers.
+- **Extensive Plugin API** - With forwards, natives, and modularity at its core, GOKZ is highly extensible.
+- Map bonus support, HUD, teleport menu, noclip, !goto, !measure, !race and much, much more.
 
 For more information about what each plugin does, please see [PLUGINS.md](PLUGINS.md).
 
@@ -59,27 +64,27 @@ For more information about what each plugin does, please see [PLUGINS.md](PLUGIN
 
 ### Server Requirements
 
- * 128 Tick (`-tickrate 128`)
- * [SourceMod ^1.11](https://www.sourcemod.net/downloads.php?branch=stable)
- * [DHooks Extension ^2.2.0](https://forums.alliedmods.net/showpost.php?p=2588686&postcount=589)
- * [MovementAPI Plugin ^2.4.2](https://github.com/danzayau/MovementAPI)
- * Optional - [GlobalAPI Plugin](https://bitbucket.org/kztimerglobalteam/globalapi-smplugin) (required for gokz-globals plugin)
- * Optional - A "console cleaner" extension to prevent `Datatable warning` server console spam
+- 128 Tick (`-tickrate 128`)
+- [SourceMod ^1.11](https://www.sourcemod.net/downloads.php?branch=stable)
+- [DHooks Extension ^2.2.0](https://forums.alliedmods.net/showpost.php?p=2588686&postcount=589)
+- [MovementAPI Plugin ^2.4.2](https://github.com/danzayau/MovementAPI)
+- Optional - [GlobalAPI Plugin](https://bitbucket.org/kztimerglobalteam/globalapi-smplugin) (required for gokz-globals plugin)
+- Optional - A "console cleaner" extension to prevent `Datatable warning` server console spam
 
 ### Installing
 
- * Ensure your server is up to date and meets the above requirements.
- * Download and extract `GOKZ-latest.zip` from the [Releases](https://github.com/KZGlobalTeam/gokz/releases) to `csgo`.
- * Add a MySQL or SQLite database called `gokz` to `csgo/addons/sourcemod/configs/databases.cfg`.
- * When the plugins first load, various configuration files will be auto-generated and can be found in `csgo/cfg/sourcemod/gokz`.
- * Use `sm_updatemappool` to populate the ranked map pool with those in `csgo/cfg/sourcemod/gokz/gokz-localranks-mappool.cfg`.
+- Ensure your server is up to date and meets the above requirements.
+- Download and extract `GOKZ-latest.zip` from the [Releases](https://github.com/KZGlobalTeam/gokz/releases) to `csgo`.
+- Add a MySQL or SQLite database called `gokz` to `csgo/addons/sourcemod/configs/databases.cfg`.
+- When the plugins first load, various configuration files will be auto-generated and can be found in `csgo/cfg/sourcemod/gokz`.
+- Use `sm_updatemappool` to populate the ranked map pool with those in `csgo/cfg/sourcemod/gokz/gokz-localranks-mappool.cfg`.
 
 Please refer to the docs for a [more detailed installation guide](https://kzglobalteam.github.io/docs/guides/install-gokz).
 
 ### Updating
 
- * Minor updates - Download and extract `GOKZ-latest-upgrade.zip` from the [Releases](https://github.com/KZGlobalTeam/gokz/releases) to `csgo`.
- * Major updates - Check the new version's release notes for specific instructions.
+- Minor updates - Download and extract `GOKZ-latest-upgrade.zip` from the [Releases](https://github.com/KZGlobalTeam/gokz/releases) to `csgo`.
+- Major updates - Check the new version's release notes for specific instructions.
 
 ### Commands
 
@@ -95,9 +100,9 @@ GOKZ is an open-source, community-driven project. If you are interested in helpi
 
 ## Authors
 
- * **DanZay** - danzayau@gmail.com - [*Steam*](https://steamcommunity.com/id/DanZay)
- * **zealain** - zealained@gmail.com - [*Steam*](https://steamcommunity.com/id/zealain)
- * **KZTimerGlobal Team** - [*GitHub*](https://github.com/KZGlobalTeam)
+- **DanZay** - danzayau@gmail.com - [_Steam_](https://steamcommunity.com/id/DanZay)
+- **zealain** - zealained@gmail.com - [_Steam_](https://steamcommunity.com/id/zealain)
+- **KZTimerGlobal Team** - [_GitHub_](https://github.com/KZGlobalTeam)
 
 ## Links
 
