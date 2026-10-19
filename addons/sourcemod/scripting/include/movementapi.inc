@@ -1,7 +1,7 @@
 /*
 	MovementAPI Plugin Include
 
-	Website: https://github.com/danzayau/MovementAPI
+	Website: https://github.com/FemboyKZ/MovementAPI
 */
 
 #if defined _movementapi_included_
@@ -27,13 +27,13 @@
 	When the player has jumped in the tick after landing and keeps their speed.
 
  	Duckbug/Crouchbug
-	When the player successfully lands due to uncrouching from mid air and not by falling
+	When the player successfully lands due to uncrouching from mid air and not by falling 
 	down. This causes no stamina loss or fall damage upon landing.
 
 	Jumpbug
- 	This is achieved by duckbugging and jumping at the same time. The player is never seen
-	as 'on ground' when bunnyhopping from a tick by tick perspective. A jumpbug inherits
-	the same behavior as a duckbug/crouchbug, along with its effects such as maintaining
+ 	This is achieved by duckbugging and jumping at the same time. The player is never seen 
+	as 'on ground' when bunnyhopping from a tick by tick perspective. A jumpbug inherits 
+	the same behavior as a duckbug/crouchbug, along with its effects such as maintaining 
 	speed due to no stamina loss.
 
 	Edgebug
@@ -126,7 +126,7 @@ forward void Movement_OnStopDucking(int client);
 forward void Movement_OnPlayerJump(int client, bool jumpbug);
 
 /**
- * Called when a player edgebugs.
+ * Called when a player edgebugs. Not called for bots.
  * Fires at most once per tick.
  * A pixelsurf or texturebug matches the same signature,
  * so a tick detected as either raises its own forward instead and this one stays silent.
@@ -143,7 +143,7 @@ forward void Movement_OnPlayerJump(int client, bool jumpbug);
 forward void Movement_OnPlayerEdgebug(int client, float origin[3], float velocity[3]);
 
 /**
- * Called when a player pixelsurfs.
+ * Called when a player pixelsurfs. Not called for bots.
  * Fires at most once per tick, and once per tick the player stays suspended on the surf.
  * Takes priority over Movement_OnPlayerEdgebug, which is suppressed for that tick.
  * With the bsppeek extension the seam is verified against the map's brush tables.
@@ -157,7 +157,7 @@ forward void Movement_OnPlayerEdgebug(int client, float origin[3], float velocit
 forward void Movement_OnPlayerPixelsurf(int client, float origin[3], float velocity[3]);
 
 /**
- * Called when a player texturebugs.
+ * Called when a player texturebugs. Not called for bots.
  * Fires at most once per tick and suppresses Movement_OnPlayerEdgebug for that tick.
  * Requires the bsppeek extension. Without it such ticks are reported as edgebugs.
  * Setting velocity when this is called may not be effective.
@@ -345,7 +345,7 @@ forward Action Movement_OnCategorizePositionPre(int client, float origin[3], flo
 forward Action Movement_OnCategorizePositionPost(int client, float origin[3], float velocity[3]);
 
 /**
- * Called before TryPlayerMove movement function is called.
+ * Called before TryPlayerMove movement function is called. Not called for bots.
  * Modifying origin or velocity parameters will change player's origin and velocity accordingly.
  *
  * @param client       Client index.
@@ -356,7 +356,7 @@ forward Action Movement_OnCategorizePositionPost(int client, float origin[3], fl
 forward Action Movement_OnTryPlayerMovePre(int client, float origin[3], float velocity[3]);
 
 /**
- * Called after TryPlayerMove movement function is called.
+ * Called after TryPlayerMove movement function is called. Not called for bots.
  * Modifying origin or velocity parameters will change player's origin and velocity accordingly.
  *
  * @param client       Client index.
@@ -369,10 +369,11 @@ forward Action Movement_OnTryPlayerMovePost(int client, float origin[3], float v
 // =====[ NATIVES ]=====
 
 /**
- * Gets whether a player's last takeoff was a jump.
+ * Gets whether a player jumped this tick.
+ * Reset at the start of each tick's movement processing.
  *
  * @param client		Client index.
- * @return				Whether player's last takeoff was a jump.
+ * @return				Whether player jumped this tick.
  */
 native bool Movement_GetJumped(int client);
 
@@ -594,13 +595,11 @@ native void Movement_SetLandingVelocity(int client, float velocity[3]);
 /**
  * Get the player's number of collisions during movement processing.
  * This function should ideally be called after inside Movement_OnTryPlayerMovePost.
- *
- * Every blocking bump trace of the most recent TryPlayerMove call, in bump order,
- * including repeated contacts with the world (wall then floor reports both).
- * Reset on each TryPlayerMove call, and StepMove can run two per tick.
+ * Collisions are from the last TryPlayerMove call, in bump order.
+ * Always 0 for bots, their TryPlayerMove calls are not tracked.
  *
  * @param client     Client index.
- * @return           Number of collisions stored, 0 to MOVEMENT_MAX_COLLISIONS.
+ * @return           Number of collisions, up to MOVEMENT_MAX_COLLISIONS.
  */
 native int Movement_GetCollisionCount(int client);
 
@@ -609,9 +608,9 @@ native int Movement_GetCollisionCount(int client);
  * This function should ideally be called after inside Movement_OnTryPlayerMovePost.
  *
  * @param client     Client index.
- * @param num		 Collision number, must not exceed Movement_GetCollisionCount's value.
+ * @param num		 Collision number, must be less than Movement_GetCollisionCount's value.
  * @param result	 Resultant vector.
- * @error            Index out of range or not below the current collision count.
+ * @error            Invalid collision index.
  */
 native void Movement_GetCollisionStartOrigin(int client, int num, float result[3]);
 
@@ -620,9 +619,9 @@ native void Movement_GetCollisionStartOrigin(int client, int num, float result[3
  * This function should ideally be called after inside Movement_OnTryPlayerMovePost.
  *
  * @param client     Client index.
- * @param num		 Collision number, must not exceed Movement_GetCollisionCount's value.
+ * @param num		 Collision number, must be less than Movement_GetCollisionCount's value.
  * @param result	 Resultant vector.
- * @error            Index out of range or not below the current collision count.
+ * @error            Invalid collision index.
  */
 native void Movement_GetCollisionEndOrigin(int client, int num, float result[3]);
 
@@ -631,9 +630,9 @@ native void Movement_GetCollisionEndOrigin(int client, int num, float result[3])
  * This function should ideally be called after inside Movement_OnTryPlayerMovePost.
  *
  * @param client     Client index.
- * @param num		 Collision number, must not exceed Movement_GetCollisionCount's value.
+ * @param num		 Collision number, must be less than Movement_GetCollisionCount's value.
  * @param result	 Resultant vector.
- * @error            Index out of range or not below the current collision count.
+ * @error            Invalid collision index.
  */
 native void Movement_GetCollisionNormal(int client, int num, float result[3]);
 
@@ -693,8 +692,7 @@ methodmap MovementAPIPlayer < MovementPlayer {
 		}
 	}
 
-	public bool GetTakeoffLadderNormal(float buffer[3])
-	{
+	public bool GetTakeoffLadderNormal(float buffer[3]) {
 		return Movement_GetTakeoffLadderNormal(this.ID, buffer);
 	}
 	
@@ -815,6 +813,7 @@ public void __pl_movementapi_SetNTVOptional()
 	MarkNativeAsOptional("Movement_GetTakeoffTick");
 	MarkNativeAsOptional("Movement_GetTakeoffCmdNum");
 	MarkNativeAsOptional("Movement_GetTakeoffLadderNormal");
+	MarkNativeAsOptional("Movement_GetNobugLandingOrigin");
 	MarkNativeAsOptional("Movement_GetLandingOrigin");
 	MarkNativeAsOptional("Movement_GetLandingVelocity");
 	MarkNativeAsOptional("Movement_GetLandingSpeed");
@@ -824,6 +823,8 @@ public void __pl_movementapi_SetNTVOptional()
 	MarkNativeAsOptional("Movement_GetTurningLeft");
 	MarkNativeAsOptional("Movement_GetTurningRight");
 	MarkNativeAsOptional("Movement_GetMaxSpeed");
+	MarkNativeAsOptional("Movement_GetDuckbugged");
+	MarkNativeAsOptional("Movement_GetJumpbugged");
 	MarkNativeAsOptional("Movement_GetProcessingOrigin");
 	MarkNativeAsOptional("Movement_GetProcessingVelocity");
 	MarkNativeAsOptional("Movement_SetTakeoffOrigin");
