@@ -1085,7 +1085,7 @@ native bool GOKZ_GetRunHeld(int client);
  * Gets the Steam account ID of the player whose run is held (gokz-rejoin).
  *
  * @param client    	Client index.
- * @return				Account ID, or 0 if the run is not held.
+ * @return				Account ID, or 0 if the run is not held or Steam had not verified the player.
  */
 native int GOKZ_GetHeldAccountID(int client);
 
@@ -1874,6 +1874,8 @@ stock void GOKZ_EmitSoundToClientSpectators(int client, const char[] sample, flo
 
 /**
  * IsFakeClient, except for a held run (gokz-rejoin), which SourceMod sees as a bot.
+ * For a player's run and stats; where a connected person is needed (chat, menus,
+ * sounds, convar queries, network info), a held run has none, so keep IsFakeClient.
  *
  * @param client		Client index.
  * @return				Whether the client is a bot.

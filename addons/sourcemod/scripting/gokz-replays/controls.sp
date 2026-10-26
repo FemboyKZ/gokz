@@ -26,7 +26,7 @@ void OnPlayerRunCmdPost_ReplayControls(int client, int cmdnum)
 
 bool UpdateReplayControlMenu(int client)
 {
-	if (!IsValidClient(client) || GOKZ_IsBot(client))
+	if (!IsValidClient(client) || IsFakeClient(client))
 	{
 		return false;
 	}

@@ -518,6 +518,11 @@ bool WillHold(int client, const char[] reason)
 	}
 	char playerName[MAX_NAME_LENGTH];
 	GetClientName(client, playerName, sizeof(playerName));
+	// The engine bot leaves to let a rejoin in, or because it was kicked
+	if (held[client] && engineBot[client])
+	{
+		return client == unbotting;
+	}
 	if (held[client])
 	{
 		return !rejoining[client] || IsLeaveReason(reason, playerName);
@@ -661,7 +666,7 @@ static bool AnnounceConnections()
 	return connectionMessages == null || connectionMessages.BoolValue;
 }
 
-// Whether gokz-global would have taken the run without the hold; mode filters are not exposed
+// Whether gokz-global would have taken the run without the hold
 static bool RunCountsGlobally(int client)
 {
 	return LibraryExists("gokz-global")

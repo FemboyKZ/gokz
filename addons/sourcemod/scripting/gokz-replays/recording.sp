@@ -49,16 +49,16 @@ void OnClientPutInServer_Recording(int client)
 void OnClientAuthorized_Recording(int client)
 {
 	// Apparently the client isn't valid yet here, so we can't check for that!
-	if(!GOKZ_IsBot(client))
+	if(!IsFakeClient(client))
 	{
 		// Create directory path for player if not exists
 		char replayPath[PLATFORM_MAX_PATH];
-		BuildPath(Path_SM, replayPath, sizeof(replayPath), "%s/%d", RP_DIRECTORY_JUMPS, GOKZ_GetSteamAccountID(client));
+		BuildPath(Path_SM, replayPath, sizeof(replayPath), "%s/%d", RP_DIRECTORY_JUMPS, GetSteamAccountID(client));
 		if (!DirExists(replayPath))
 		{
 			CreateDirectory(replayPath, 511);
 		}
-		BuildPath(Path_SM, replayPath, sizeof(replayPath), "%s/%d/%s", RP_DIRECTORY_JUMPS, GOKZ_GetSteamAccountID(client), RP_DIRECTORY_BLOCKJUMPS);
+		BuildPath(Path_SM, replayPath, sizeof(replayPath), "%s/%d/%s", RP_DIRECTORY_JUMPS, GetSteamAccountID(client), RP_DIRECTORY_BLOCKJUMPS);
 		if (!DirExists(replayPath))
 		{
 			CreateDirectory(replayPath, 511);
@@ -1007,7 +1007,7 @@ static void CreateReplaysDirectory()
 
 public void MYAWCheck(QueryCookie cookie, int client, ConVarQueryResult result, const char[] cvarName, const char[] cvarValue, any value)
 {
-	if (IsValidClient(client) && !GOKZ_IsBot(client))
+	if (IsValidClient(client) && !IsFakeClient(client))
 	{
 		playerMYaw[client] = StringToFloat(cvarValue);
 	}
@@ -1015,7 +1015,7 @@ public void MYAWCheck(QueryCookie cookie, int client, ConVarQueryResult result, 
 
 public void SensitivityCheck(QueryCookie cookie, int client, ConVarQueryResult result, const char[] cvarName, const char[] cvarValue, any value)
 {
-	if (IsValidClient(client) && !GOKZ_IsBot(client))
+	if (IsValidClient(client) && !IsFakeClient(client))
 	{
 		playerSensitivity[client] = StringToFloat(cvarValue);
 	}

@@ -234,7 +234,8 @@ void PrintConnectMessage(int client)
 
 void PrintDisconnectMessage(int client, Event event) // Hooked to player_disconnect event
 {
-	if (!gCV_gokz_connection_messages.BoolValue || IsFakeClient(client))
+	// A held run's release is its engine bot leaving
+	if (!gCV_gokz_connection_messages.BoolValue || GOKZ_IsBot(client))
 	{
 		return;
 	}
