@@ -10,6 +10,11 @@ static bool validTime[MAXPLAYERS + 1];
 
 // =====[ PUBLIC ]=====
 
+int GetTimerStartMode(int client)
+{
+	return lastStartMode[client];
+}
+
 bool GetTimerRunning(int client)
 {
 	return timerRunning[client];

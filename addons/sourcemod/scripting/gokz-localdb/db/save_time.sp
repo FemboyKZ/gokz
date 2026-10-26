@@ -13,6 +13,11 @@ void DB_SaveTime(int client, int course, int mode, int style, float runTime, int
 	
 	char query[1024];
 	int steamID = GetSteamAccountID(client);
+	if (steamID == 0)
+	{
+		GOKZ_PrintToChat(client, true, "%t", "Time Not Saved (Unverified)");
+		return;
+	}
 	int mapID = GOKZ_DB_GetCurrentMapID();
 	int runTimeMS = GOKZ_DB_TimeFloatToInt(runTime);
 	

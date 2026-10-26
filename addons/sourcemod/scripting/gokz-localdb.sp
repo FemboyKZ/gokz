@@ -27,6 +27,7 @@ Database gH_DB = null;
 DatabaseType g_DBType = DatabaseType_None;
 bool gB_ClientSetUp[MAXPLAYERS + 1];
 bool gB_ClientPostAdminChecked[MAXPLAYERS + 1];
+bool gB_WarnedUnverified[MAXPLAYERS + 1];
 bool gB_Cheater[MAXPLAYERS + 1];
 int gI_PBJSCache[MAXPLAYERS + 1][MODE_COUNT][JUMPTYPE_COUNT][JUMPSTATDB_CACHE_COUNT];
 bool gB_MapSetUp;
@@ -142,6 +143,7 @@ public void GOKZ_OnOptionsLoaded(int client)
 public void OnClientDisconnect(int client)
 {
 	gB_ClientSetUp[client] = false;
+	gB_WarnedUnverified[client] = false;
 	gB_ClientPostAdminChecked[client] = false;
 }
 
@@ -157,6 +159,15 @@ public void GOKZ_OnOptionsMenuReady(TopMenu topMenu)
 {
 	OnOptionsMenuReady_Options();
 	OnOptionsMenuReady_OptionsMenu(topMenu);
+}
+
+public void GOKZ_OnTimerStart_Post(int client, int course)
+{
+	if (!gB_WarnedUnverified[client] && !IsFakeClient(client) && GetSteamAccountID(client) == 0)
+	{
+		gB_WarnedUnverified[client] = true;
+		GOKZ_PrintToChat(client, true, "%t", "Unverified Run Warning");
+	}
 }
 
 public void GOKZ_OnTimerEnd_Post(int client, int course, float time, int teleportsUsed)
