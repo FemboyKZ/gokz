@@ -105,6 +105,12 @@ void OnClientPutInServer_BhopTracking(int client)
 	ResetBhopStats(client);
 }
 
+// Keeps the samples, so a rejoin cannot clear them
+void OnRejoin_BhopTracking(int client)
+{
+	ResetBhopCmdnums(client);
+}
+
 void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 {
 	if (gCV_sv_autobunnyhopping.BoolValue)
@@ -284,6 +290,12 @@ static void ResetBhopStats(int client)
 	gI_ButtonsIndex[client] = 0;
 	gI_BhopCount[client] = 0;
 	gI_BhopIndex[client] = 0;
+	ResetBhopCmdnums(client);
+}
+
+// State tied to the connection's command numbers
+static void ResetBhopCmdnums(int client)
+{
 	gI_BhopLastTakeoffCmdnum[client] = 0;
 	gI_BhopLastRecordedBhopCmdnum[client] = 0;
 	gB_BhopPostJumpInputsPending[client] = false;
@@ -295,7 +307,9 @@ static void ResetBhopStats(int client)
 // Returns true if ther was a jump last tick and was within a number of ticks after landing
 static bool HitBhop(int client, int cmdnum)
 {
-	return JustJumped(client, cmdnum) && Movement_GetTakeoffCmdNum(client) - Movement_GetLandingCmdNum(client) <= AC_MAX_BHOP_GROUND_TICKS;
+	// A landing numbered after the takeoff is from before a gokz-rejoin reconnect
+	return JustJumped(client, cmdnum) && Movement_GetLandingCmdNum(client) <= Movement_GetTakeoffCmdNum(client)
+		 && Movement_GetTakeoffCmdNum(client) - Movement_GetLandingCmdNum(client) <= AC_MAX_BHOP_GROUND_TICKS;
 }
 
 static bool JustJumped(int client, int cmdnum)

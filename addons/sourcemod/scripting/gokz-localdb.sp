@@ -120,7 +120,8 @@ public void OnClientPostAdminCheck(int client)
 	// We need this after OnClientPutInServer cause that's where the VBs get reset
 	gB_ClientPostAdminChecked[client] = true;
 	
-	if (gB_MapSetUp && GOKZ_GetOption(client, gC_DBOptionNames[DBOption_AutoLoadTimerSetup]) == DBOption_Enabled)
+	if (gB_MapSetUp && GOKZ_GetOption(client, gC_DBOptionNames[DBOption_AutoLoadTimerSetup]) == DBOption_Enabled
+		 && !GOKZ_GetRunCarriedOver(client))
 	{
 		DB_LoadTimerSetup(client);
 	}
@@ -133,7 +134,8 @@ public void GOKZ_DB_OnClientSetup(int client, int steamID, bool cheater)
 
 public void GOKZ_OnOptionsLoaded(int client)
 {
-	if (gB_MapSetUp && gB_ClientPostAdminChecked[client] && GOKZ_GetOption(client, gC_DBOptionNames[DBOption_AutoLoadTimerSetup]) == DBOption_Enabled)
+	if (gB_MapSetUp && gB_ClientPostAdminChecked[client] && GOKZ_GetOption(client, gC_DBOptionNames[DBOption_AutoLoadTimerSetup]) == DBOption_Enabled
+		 && !GOKZ_GetRunCarriedOver(client))
 	{
 		DB_LoadTimerSetup(client);
 	}
@@ -141,8 +143,11 @@ public void GOKZ_OnOptionsLoaded(int client)
 
 public void OnClientDisconnect(int client)
 {
-	gB_ClientSetUp[client] = false;
-	gB_ClientPostAdminChecked[client] = false;
+	if (!GOKZ_GetRunCarriedOver(client))
+	{
+		gB_ClientSetUp[client] = false;
+		gB_ClientPostAdminChecked[client] = false;
+	}
 }
 
 public void GOKZ_OnCourseRegistered(int course)

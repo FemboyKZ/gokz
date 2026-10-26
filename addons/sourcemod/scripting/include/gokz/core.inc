@@ -1066,6 +1066,39 @@ native bool GOKZ_SetCourse(int client, int course);
 native bool GOKZ_GetPaused(int client);
 
 /**
+ * Gets whether the client's connection carries over their run (a gokz-rejoin rejoin).
+ *
+ * @param client    	Client index.
+ * @return				Whether the run carries over.
+ */
+native bool GOKZ_GetRunCarriedOver(int client);
+
+/**
+ * Gets whether the client has left and their run is held for them (gokz-rejoin).
+ *
+ * @param client    	Client index.
+ * @return				Whether the run is held.
+ */
+native bool GOKZ_GetRunHeld(int client);
+
+/**
+ * Gets the Steam account ID of the player whose run is held (gokz-rejoin).
+ *
+ * @param client    	Client index.
+ * @return				Account ID, or 0 if the run is not held or Steam had not verified the player.
+ */
+native int GOKZ_GetHeldAccountID(int client);
+
+/**
+ * Gets whether a disconnect, in a player_disconnect hook, keeps the run held (gokz-rejoin).
+ *
+ * @param client    	Client index.
+ * @param reason		Disconnect reason from the event.
+ * @return				Whether the run is held.
+ */
+native bool GOKZ_GetRunHeldOnDisconnect(int client, const char[] reason);
+
+/**
  * Gets a player's current run time.
  *
  * @param client    	Client index.
@@ -1831,6 +1864,34 @@ stock void GOKZ_EmitSoundToClientSpectators(int client, const char[] sample, flo
 	}
 }
 
+/**
+ * IsFakeClient, except for a held run (gokz-rejoin), which SourceMod sees as a bot.
+ * For a player's run and stats; where a connected person is needed (chat, menus,
+ * sounds, convar queries, network info), a held run has none, so keep IsFakeClient.
+ *
+ * @param client		Client index.
+ * @return				Whether the client is a bot.
+ */
+stock bool GOKZ_IsBot(int client)
+{
+	return IsFakeClient(client) && !GOKZ_GetRunHeld(client);
+}
+
+/**
+ * GetSteamAccountID, giving the held player's account while gokz-rejoin holds their run.
+ *
+ * @param client		Client index.
+ * @param validate		Whether SourceMod must have validated the ID.
+ * @return				Steam account ID, or 0 if not available.
+ */
+stock int GOKZ_GetSteamAccountID(int client, bool validate = true)
+{
+	int accountID = GOKZ_GetHeldAccountID(client);
+	return accountID != 0 ? accountID : GetSteamAccountID(client, validate);
+}
+
+
+
 // =====[ DEPENDENCY ]=====
 
 public SharedPlugin __pl_gokz_core = 
@@ -1893,6 +1954,10 @@ public void __pl_gokz_core_SetNTVOptional()
 	MarkNativeAsOptional("GOKZ_GetCourse");
 	MarkNativeAsOptional("GOKZ_SetCourse");
 	MarkNativeAsOptional("GOKZ_GetPaused");
+	MarkNativeAsOptional("GOKZ_GetRunCarriedOver");
+	MarkNativeAsOptional("GOKZ_GetRunHeld");
+	MarkNativeAsOptional("GOKZ_GetHeldAccountID");
+	MarkNativeAsOptional("GOKZ_GetRunHeldOnDisconnect");
 	MarkNativeAsOptional("GOKZ_GetTime");
 	MarkNativeAsOptional("GOKZ_SetTime");
 	MarkNativeAsOptional("GOKZ_InvalidateRun");

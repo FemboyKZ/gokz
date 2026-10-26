@@ -225,19 +225,27 @@ void PrintConnectMessage(int client)
 		return;
 	}
 	
-	GOKZ_PrintToChatAll(false, "%t", "Client Connection Message", client);
+	// gokz-rejoin announces those itself
+	if (!GOKZ_GetRunCarriedOver(client))
+	{
+		GOKZ_PrintToChatAll(false, "%t", "Client Connection Message", client);
+	}
 }
 
 void PrintDisconnectMessage(int client, Event event) // Hooked to player_disconnect event
 {
-	if (!gCV_gokz_connection_messages.BoolValue || IsFakeClient(client))
+	// A held run's release is its engine bot leaving
+	if (!gCV_gokz_connection_messages.BoolValue || GOKZ_IsBot(client))
 	{
 		return;
 	}
 	
 	char reason[128];
 	event.GetString("reason", reason, sizeof(reason));
-	GOKZ_PrintToChatAll(false, "%t", "Client Disconnection Message", client, reason);
+	if (!GOKZ_GetRunHeldOnDisconnect(client, reason))
+	{
+		GOKZ_PrintToChatAll(false, "%t", "Client Disconnection Message", client, reason);
+	}
 }
 
 

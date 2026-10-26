@@ -38,7 +38,9 @@ void SendTime(int client, int course, float time, int teleportsUsed)
 	dp.WriteFloat(time);
 	dp.WriteString(gC_CurrentMap);
 
-	GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid));
+	// As AuthId_Steam2 gives it, also for a held run's slot, which SourceMod sees as a bot
+	int accountID = GOKZ_GetSteamAccountID(client);
+	FormatEx(steamid, sizeof(steamid), "STEAM_1:%d:%d", accountID & 1, accountID >> 1);
 	GOKZ_GL_GetModeString(mode, modeStr, sizeof(modeStr));
 	GlobalAPI_CreateRecord(SendTimeCallback, dp, steamid, gI_MapID, modeStr, course, 128, teleportsUsed, time);
 }
