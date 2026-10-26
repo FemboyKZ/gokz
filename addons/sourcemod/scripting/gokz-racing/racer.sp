@@ -422,6 +422,12 @@ void OnClientPutInServer_Racer(int client)
 
 void OnClientDisconnect_Racer(int client)
 {
+	LeaveRace(client);
+	ResetRacer(client);
+}
+
+void LeaveRace(int client)
+{
 	// Abort if player was the host of the race, else surrender
 	if (InRace(client))
 	{
@@ -434,6 +440,4 @@ void OnClientDisconnect_Racer(int client)
 			SurrenderRacer(client);
 		}
 	}
-	
-	ResetRacer(client);
 } 

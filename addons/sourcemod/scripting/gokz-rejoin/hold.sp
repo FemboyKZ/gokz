@@ -281,6 +281,27 @@ void PauseHeldPlayers()
 	}
 }
 
+// Its engine bot, so releasing it frees the slot at once
+int FindOldestHold()
+{
+	int oldest = 0;
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		if (held[client] && engineBot[client] && !rejoining[client]
+			 && (oldest == 0 || heldSlot[client].deadline < heldSlot[oldest].deadline))
+		{
+			oldest = client;
+		}
+	}
+	return oldest;
+}
+
+void ReleaseForSlot(int client)
+{
+	NoteHoldEnded(client, AwayRunEnd_ServerFull);
+	Release(client, "Server full");
+}
+
 void ReleaseAllHolds()
 {
 	for (int client = 1; client <= MaxClients; client++)

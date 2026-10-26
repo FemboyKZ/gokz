@@ -38,6 +38,7 @@ static DynamicHook signonStateHook;
 static Handle checkConnectCall;
 
 static bool inGetFreeClient;
+static bool inConnectClient;
 static bool sourceModOnly;
 static int makingBot;
 static int connectingAccountID;
@@ -325,6 +326,7 @@ public MRESReturn DHooks_OnConnectClient(Address server, DHookReturn hReturn, DH
 	}
 
 	ReleaseExpiredHolds();
+	inConnectClient = true;
 
 	// The cookie starts with the claimed SteamID64; CheckChallengeType checks the ticket
 	connectingAccountID = 0;
@@ -364,6 +366,7 @@ public MRESReturn DHooks_OnConnectClientPost(Address server, DHookReturn hReturn
 	}
 	routedClient = 0;
 	connectingAccountID = 0;
+	inConnectClient = false;
 
 	// The engine set it to the held userid, which would make later players reuse old userids
 	if (savedUserIDCounter != -1)
@@ -413,6 +416,18 @@ public MRESReturn DHooks_OnGetFreeClientPost(Address server, DHookReturn hReturn
 		if (IsHeld(client) && !IsEngineBot(client))
 		{
 			SetFakePlayerFlag(client, false);
+		}
+	}
+
+	// Server full for a player (not CreateFakeClient): the oldest hold gives up its slot
+	if (inConnectClient && hReturn.Value == 0)
+	{
+		int client = FindOldestHold();
+		if (client != 0)
+		{
+			ReleaseForSlot(client);
+			hReturn.Value = GetBaseClient(client);
+			return MRES_Override;
 		}
 	}
 	return MRES_Ignored;

@@ -65,6 +65,11 @@ public void OnClientDisconnect(int client)
 	{
 		OnClientDisconnect_Racer(client);
 	}
+	// The run keeps its slot, but the race does not wait for it
+	else if (GOKZ_GetRunHeld(client))
+	{
+		LeaveRace(client);
+	}
 }
 
 public Action GOKZ_OnTimerStart(int client, int course)

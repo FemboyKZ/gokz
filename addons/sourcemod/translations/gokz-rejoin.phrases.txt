@@ -78,4 +78,8 @@
 	{
 		"en"		"{grey}Your run was not kept: the map changed while you were away."
 	}
+	"Away Run End (Server Full)"
+	{
+		"en"		"{grey}Your run was not kept: the server filled up and needed your slot."
+	}
 }

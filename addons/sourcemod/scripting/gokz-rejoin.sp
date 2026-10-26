@@ -10,8 +10,8 @@
 	  The game's ClientConnect is deferred to signon SPAWN, so the player is
 	  never out of game while loading. SourceMod still sees a disconnect and a connect,
 	  gokz-core's GOKZ_GetRunCarriedOver tells plugins it is one run.
-	- Release: expiry, a kick, the run ending or plugin unload fire the held player_disconnect
-	  and the real disconnect, a map change drops the hold.
+	- Release: expiry, a kick, the run ending, a full server (oldest hold first) or plugin
+	  unload fire the held player_disconnect and the real disconnect, a map change drops the hold.
 
 	Steam:
 	  sv_lan 1                           nothing is held, the engine checks no tickets

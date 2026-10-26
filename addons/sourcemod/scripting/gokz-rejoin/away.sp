@@ -5,7 +5,8 @@ enum AwayRunEnd
 	AwayRunEnd_RoundRestart,
 	AwayRunEnd_Stopped,
 	AwayRunEnd_Timeout,
-	AwayRunEnd_MapChange
+	AwayRunEnd_MapChange,
+	AwayRunEnd_ServerFull
 }
 
 enum struct AwayNote
@@ -145,6 +146,10 @@ void ShowAwayNote(int client)
 		case AwayRunEnd_MapChange:
 		{
 			GOKZ_PrintToChat(client, true, "%t", "Away Run End (Map Change)");
+		}
+		case AwayRunEnd_ServerFull:
+		{
+			GOKZ_PrintToChat(client, true, "%t", "Away Run End (Server Full)");
 		}
 	}
 }
