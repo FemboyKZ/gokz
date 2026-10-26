@@ -10,6 +10,8 @@ enum struct HeldSlot
 	char steamID64[24];
 	int holdMinutes;
 	float timeAtHold;
+	bool pausedAtHold;
+	bool verified; // by Steam, so the run may save under accountID
 	bool globalRun;
 }
 
@@ -82,6 +84,11 @@ int GetHeldUserID(int client)
 	return heldSlot[client].userID;
 }
 
+bool IsHeldVerified(int client)
+{
+	return heldSlot[client].verified;
+}
+
 int GetHeldAccountID(int client)
 {
 	return heldSlot[client].accountID;
@@ -90,6 +97,11 @@ int GetHeldAccountID(int client)
 int GetHoldMinutes(int client)
 {
 	return heldSlot[client].holdMinutes;
+}
+
+void GetHeldSteamID64(int client, char[] buffer, int maxlength)
+{
+	strcopy(buffer, maxlength, heldSlot[client].steamID64);
 }
 
 void GetHeldNetworkID(int client, char[] buffer, int maxlength)
@@ -462,6 +474,12 @@ bool OnEngineRemovesClient(int client)
 	return false;
 }
 
+// Refused after routing (ticket, ban, ...): the bot was already stopped
+void OnRejoinRefused(int client)
+{
+	RequestFrame(Frame_BecomeBot, client);
+}
+
 void OnRejoinRouted(int client)
 {
 	rejoining[client] = true;
@@ -543,6 +561,10 @@ void OnRejoinActive(int client)
 	SDKUnhook(client, SDKHook_SetTransmit, Hook_HeldSetTransmit);
 	UnhookRejoinConnection(client);
 	UpdateHibernation();
+	if (LibraryExists("gokz-jumpstats"))
+	{
+		GOKZ_JS_InvalidateJump(client);
+	}
 
 	LogMessage("\"%s\" <%s> rejoined their held slot", heldSlot[client].name, heldSlot[client].networkID);
 	if (AnnounceConnections())
@@ -581,7 +603,7 @@ bool OnPlayerRunCmd_Hold(int client, float angles[3])
 	bool paused = GOKZ_GetPaused(client);
 	if (ranFor < 0.1)
 	{
-		GOKZ_PrintToChat(client, true, "%t", paused ? "Rejoined Held Slot (Paused)" : "Rejoined Held Slot");
+		GOKZ_PrintToChat(client, true, "%t", !paused ? "Rejoined Held Slot" : heldSlot[client].pausedAtHold ? "Rejoined Held Slot (Still Paused)" : "Rejoined Held Slot (Paused)");
 	}
 	else
 	{
@@ -609,7 +631,12 @@ void OnTimerStopped_Hold(int client)
 // gokz-chat's gokz_connection_messages
 static bool AnnounceConnections()
 {
-	ConVar connectionMessages = FindConVar("gokz_connection_messages");
+	// gokz-chat's, which may load after this plugin
+	static ConVar connectionMessages;
+	if (connectionMessages == null)
+	{
+		connectionMessages = FindConVar("gokz_connection_messages");
+	}
 	return connectionMessages == null || connectionMessages.BoolValue;
 }
 
@@ -617,11 +644,8 @@ static bool AnnounceConnections()
 static bool RunCountsGlobally(int client)
 {
 	return LibraryExists("gokz-global")
-		 && GOKZ_GL_GetAPIKeyValid()
-		 && GOKZ_GL_GetPluginsValid()
-		 && GOKZ_GL_GetSettingsEnforcerValid()
-		 && GOKZ_GL_GetMapValid()
-		 && GOKZ_GL_GetPlayerValid(client);
+		 && GOKZ_GL_GetPlayerValid(client)
+		 && GOKZ_GL_GetRunValid(client);
 }
 
 static bool IsLeaveReason(const char[] reason, const char[] playerName)
@@ -696,6 +720,8 @@ static void StartHold(int client)
 	heldSlot[client].deadline = GetEngineTime() + gCV_gokz_rejoin_hold_time.FloatValue;
 	heldSlot[client].holdMinutes = RoundToCeil(gCV_gokz_rejoin_hold_time.FloatValue / 60.0);
 	heldSlot[client].timeAtHold = GOKZ_GetTime(client);
+	heldSlot[client].pausedAtHold = GOKZ_GetPaused(client);
+	heldSlot[client].verified = IsClientAuthorized(client);
 	heldSlot[client].globalRun = RunCountsGlobally(client);
 	GetClientAuthId(client, AuthId_SteamID64, heldSlot[client].steamID64, sizeof(HeldSlot::steamID64), false);
 	GetClientName(client, heldSlot[client].name, sizeof(HeldSlot::name));

@@ -96,5 +96,11 @@ public void DB_TxnSuccess_SetupClient(Handle db, DataPack data, int numQueries, 
 	}
 	
 	gB_ClientSetUp[client] = true;
+	if (gB_CheaterPending[client])
+	{
+		gB_CheaterPending[client] = false;
+		gB_Cheater[client] = false; // so the database gets written
+		DB_SetCheater(client, true);
+	}
 	Call_OnClientSetup(client, steamID, gB_Cheater[client]);
 } 

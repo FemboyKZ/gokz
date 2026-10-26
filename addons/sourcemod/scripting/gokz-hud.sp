@@ -314,7 +314,9 @@ static void SetHUDInfo(KZPlayer player, HUDInfo info, int cmdnum)
 	info.OnLadder = player.OnLadder;
 	info.Noclipping = player.Noclipping;
 	info.Ducking = Movement_GetDucking(player.ID);
-	info.HitBhop = (Movement_GetJumped(player.ID) && Movement_GetTakeoffCmdNum(player.ID) == cmdnum) && Movement_GetTakeoffCmdNum(player.ID) - Movement_GetLandingCmdNum(player.ID) <= HUD_MAX_BHOP_GROUND_TICKS;
+	// A landing numbered after the takeoff is from before a gokz-rejoin reconnect
+	info.HitBhop = (Movement_GetJumped(player.ID) && Movement_GetTakeoffCmdNum(player.ID) == cmdnum) && Movement_GetLandingCmdNum(player.ID) <= Movement_GetTakeoffCmdNum(player.ID)
+		 && Movement_GetTakeoffCmdNum(player.ID) - Movement_GetLandingCmdNum(player.ID) <= HUD_MAX_BHOP_GROUND_TICKS;
 	info.Speed = player.Speed;
 	info.ID = player.ID;
 	info.Jumped = player.Jumped;

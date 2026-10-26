@@ -235,6 +235,14 @@ native bool GOKZ_GL_GetPlayerValid(int client);
  */
 native bool GOKZ_GL_SkipsHeldRuns();
 
+/**
+ * Gets whether the client's current run would be submitted, its mode included.
+ *
+ * @param client		Client index.
+ * @return				True if the run counts globally.
+ */
+native bool GOKZ_GL_GetRunValid(int client);
+
 
 
 // =====[ STOCKS ]=====
@@ -320,6 +328,7 @@ public void __pl_gokz_global_SetNTVOptional()
 	MarkNativeAsOptional("GOKZ_GL_GetMapValid");
 	MarkNativeAsOptional("GOKZ_GL_GetPlayerValid");
 	MarkNativeAsOptional("GOKZ_GL_SkipsHeldRuns");
+	MarkNativeAsOptional("GOKZ_GL_GetRunValid");
 	MarkNativeAsOptional("GOKZ_GL_GetPoints");
 	MarkNativeAsOptional("GOKZ_GL_GetMapPoints");
 	MarkNativeAsOptional("GOKZ_GL_GetRankPoints");

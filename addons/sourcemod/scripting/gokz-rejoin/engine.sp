@@ -358,6 +358,10 @@ public MRESReturn DHooks_OnConnectClientPost(Address server, DHookReturn hReturn
 	{
 		OnRejoinRouted(routedClient);
 	}
+	else if (routedClient != 0)
+	{
+		OnRejoinRefused(routedClient);
+	}
 	routedClient = 0;
 	connectingAccountID = 0;
 

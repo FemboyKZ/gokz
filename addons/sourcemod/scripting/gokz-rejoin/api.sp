@@ -98,7 +98,7 @@ public int Native_GetAccountID(Handle plugin, int numParams)
 	{
 		return ThrowNativeError(SP_ERROR_PARAM, "Invalid client index %d", client);
 	}
-	return OwnsHeldUserID(client) ? GetHeldAccountID(client) : 0;
+	return OwnsHeldUserID(client) && IsHeldVerified(client) ? GetHeldAccountID(client) : 0;
 }
 
 static bool IsClientIndex(int client)

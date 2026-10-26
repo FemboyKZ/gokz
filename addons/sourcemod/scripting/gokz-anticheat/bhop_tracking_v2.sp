@@ -278,7 +278,9 @@ static int CheckForRepeatingJumpInputsCountV2(int client, int threshold, int sam
 // Returns true if ther was a jump last tick and was within a number of ticks after landing
 static bool HitBhopV2(int client, int cmdnum)
 {
-	return JustJumpedV2(client, cmdnum) && Movement_GetTakeoffCmdNum(client) - Movement_GetLandingCmdNum(client) <= AC_MAX_BHOP_GROUND_TICKS;
+	// A landing numbered after the takeoff is from before a gokz-rejoin reconnect
+	return JustJumpedV2(client, cmdnum) && Movement_GetLandingCmdNum(client) <= Movement_GetTakeoffCmdNum(client)
+		 && Movement_GetTakeoffCmdNum(client) - Movement_GetLandingCmdNum(client) <= AC_MAX_BHOP_GROUND_TICKS;
 }
 
 static bool JustJumpedV2(int client, int cmdnum)

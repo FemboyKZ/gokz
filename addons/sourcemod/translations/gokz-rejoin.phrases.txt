@@ -9,6 +9,10 @@
 	{
 		"en"		"{grey}Welcome back, your run was paused once you came to a stop. Type {default}!pause{grey} to resume."
 	}
+	"Rejoined Held Slot (Still Paused)"
+	{
+		"en"		"{grey}Welcome back, your run is still paused. Type {default}!pause{grey} to resume."
+	}
 	"Rejoined Held Slot (Ran)"
 	{
 		// Welcome back, your timer ran on for 00:12.34 while you were away.

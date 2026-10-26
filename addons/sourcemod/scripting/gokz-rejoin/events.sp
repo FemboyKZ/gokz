@@ -26,6 +26,9 @@ public Action Event_PlayerDisconnect(Event event, const char[] name, bool dontBr
 		char networkID[32];
 		GetHeldNetworkID(client, networkID, sizeof(networkID));
 		event.SetString("networkid", networkID);
+		char steamID64[24];
+		GetHeldSteamID64(client, steamID64, sizeof(steamID64));
+		event.SetString("xuid", steamID64);
 	}
 
 	char reason[128], playerName[MAX_NAME_LENGTH];
@@ -71,8 +74,12 @@ public Action CommandListener_Kick(int client, const char[] command, int argc)
 {
 	char args[256];
 	GetCmdArgString(args, sizeof(args));
-	StripQuotes(args);
 	TrimString(args);
+	// Quoted, the target is the first argument; unquoted, the tokenizer splits a SteamID at its colons
+	if (args[0] == '"')
+	{
+		GetCmdArg(1, args, sizeof(args));
+	}
 	int target = FindKickTarget(args, StrEqual(command, "kick"));
 	if (target != 0)
 	{

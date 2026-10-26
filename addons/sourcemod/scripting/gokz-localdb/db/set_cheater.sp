@@ -14,6 +14,7 @@ void DB_SetCheater(int cheaterClient, bool cheater)
 	gB_Cheater[cheaterClient] = cheater;
 	if (GetSteamAccountID(cheaterClient) == 0)
 	{
+		gB_CheaterPending[cheaterClient] = cheater;
 		return;
 	}
 	

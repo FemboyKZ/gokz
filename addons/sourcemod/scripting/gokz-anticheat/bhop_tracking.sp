@@ -307,7 +307,9 @@ static void ResetBhopCmdnums(int client)
 // Returns true if ther was a jump last tick and was within a number of ticks after landing
 static bool HitBhop(int client, int cmdnum)
 {
-	return JustJumped(client, cmdnum) && Movement_GetTakeoffCmdNum(client) - Movement_GetLandingCmdNum(client) <= AC_MAX_BHOP_GROUND_TICKS;
+	// A landing numbered after the takeoff is from before a gokz-rejoin reconnect
+	return JustJumped(client, cmdnum) && Movement_GetLandingCmdNum(client) <= Movement_GetTakeoffCmdNum(client)
+		 && Movement_GetTakeoffCmdNum(client) - Movement_GetLandingCmdNum(client) <= AC_MAX_BHOP_GROUND_TICKS;
 }
 
 static bool JustJumped(int client, int cmdnum)

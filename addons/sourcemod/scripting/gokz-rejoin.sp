@@ -165,6 +165,15 @@ static void CheckHeldRunsStayLocal()
 	if (!HeldRunsStayLocal())
 	{
 		LogError("gokz-global lacks the held run check, so no slot will be held.");
+		// It would submit runs that went through a hold
+		ReleaseAllHolds();
+		for (int client = 1; client <= MaxClients; client++)
+		{
+			if (IsClientInGame(client) && GOKZ_GetHeldInThisRun(client))
+			{
+				GOKZ_StopTimer(client);
+			}
+		}
 	}
 }
 
