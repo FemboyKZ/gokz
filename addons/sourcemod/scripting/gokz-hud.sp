@@ -33,6 +33,7 @@ bool gB_JBTakeoff[MAXPLAYERS + 1];
 bool gB_FastUpdateRate[MAXPLAYERS + 1];
 int gI_DynamicMenu[MAXPLAYERS + 1];
 
+#include "gokz-hud/spectate_name.sp"
 #include "gokz-hud/spectate_text.sp"
 #include "gokz-hud/commands.sp"
 #include "gokz-hud/hide_weapon.sp"
@@ -146,7 +147,7 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 	{
 		SetHUDInfo(player, info, cmdnum);
 	}
-	else if (targetPlayer.ID != -1 && !targetPlayer.Fake)
+	else if (targetPlayer.ID != -1 && !GOKZ_IsBot(targetPlayer.ID))
 	{
 		SetHUDInfo(targetPlayer, info, cmdnum);
 	}
@@ -270,6 +271,10 @@ public void OnGameFrame()
 	if (GetGameTickCount() % 4 == 0)
 	{
 		UpdateSpecList();
+	}
+	if (GetGameTickCount() % 32 == 0)
+	{
+		OnGameFrame_SpectateName();
 	}
 }
 

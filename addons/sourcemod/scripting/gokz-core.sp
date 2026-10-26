@@ -17,6 +17,7 @@
 #undef REQUIRE_PLUGIN
 #include <gokz/kzplayer>
 #include <gokz/jumpstats>
+#include <gokz/rejoin>
 
 #pragma newdecls required
 #pragma semicolon 1
@@ -142,6 +143,18 @@ public void OnAllPluginsLoaded()
 
 public void OnClientPutInServer(int client)
 {
+	// Command numbers restart with each connection
+	gI_TeleportCmdNum[client] = 0;
+
+	// Same entity and run; SDKHooks dropped its hooks with the old connection, DHooks dedupes
+	if (GOKZ_RJ_IsRejoinIfAvailable(client))
+	{
+		OnRejoin_Options(client);
+		OnClientPutInServer_Triggerfix(client);
+		HookClientEvents(client);
+		return;
+	}
+
 	OnClientPutInServer_Timer(client);
 	OnClientPutInServer_Pause(client);
 	OnClientPutInServer_Teleports(client);
@@ -159,8 +172,16 @@ public void OnClientPutInServer(int client)
 
 public void OnClientDisconnect(int client)
 {
-	OnClientDisconnect_Timer(client);
+	if (!GOKZ_RJ_IsRejoinIfAvailable(client))
+	{
+		OnClientDisconnect_Timer(client);
+	}
 	OnClientDisconnect_ValidJump(client);
+}
+
+public void GOKZ_RJ_OnHoldStart(int client)
+{
+	OnHoldStart_Timer(client);
 }
 
 public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon, int &subtype, int &cmdnum, int &tickcount, int &seed, int mouse[2])
@@ -405,7 +426,11 @@ public void OnEntitySpawnedPost(int entity)
 
 public void OnClientConnected(int client)
 {
-	OnClientConnected_Triggerfix(client);
+	// Still touching the same triggers
+	if (!GOKZ_RJ_IsRejoinIfAvailable(client))
+	{
+		OnClientConnected_Triggerfix(client);
+	}
 }
 
 public void OnRoundStart(Event event, const char[] name, bool dontBroadcast) // round_start post no copy hook

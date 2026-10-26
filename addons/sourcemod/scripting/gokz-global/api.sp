@@ -51,6 +51,7 @@ void CreateNatives()
 	CreateNative("GOKZ_GL_GetSettingsEnforcerValid", Native_GetSettingsEnforcerValid);
 	CreateNative("GOKZ_GL_GetMapValid", Native_GetMapValid);
 	CreateNative("GOKZ_GL_GetPlayerValid", Native_GetPlayerValid);
+	CreateNative("GOKZ_GL_SkipsHeldRuns", Native_SkipsHeldRuns);
 }
 
 public int Native_PrintRecords(Handle plugin, int numParams)
@@ -135,6 +136,11 @@ public int Native_GetSettingsEnforcerValid(Handle plugin, int numParams)
 public int Native_GetMapValid(Handle plugin, int numParams)
 {
 	return view_as<int>(MapCheck());
+}
+
+public int Native_SkipsHeldRuns(Handle plugin, int numParams)
+{
+	return true;
 }
 
 public int Native_GetPlayerValid(Handle plugin, int numParams)

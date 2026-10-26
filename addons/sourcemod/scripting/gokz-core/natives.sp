@@ -50,6 +50,11 @@ void CreateNatives()
 	CreateNative("GOKZ_GetCourse", Native_GetCourse);
 	CreateNative("GOKZ_SetCourse", Native_SetCourse);
 	CreateNative("GOKZ_GetPaused", Native_GetPaused);
+	CreateNative("GOKZ_GetRunCarriedOver", Native_GetRunCarriedOver);
+	CreateNative("GOKZ_GetRunHeld", Native_GetRunHeld);
+	CreateNative("GOKZ_GetHeldAccountID", Native_GetHeldAccountID);
+	CreateNative("GOKZ_GetRunHeldOnDisconnect", Native_GetRunHeldOnDisconnect);
+	CreateNative("GOKZ_GetHeldInThisRun", Native_GetHeldInThisRun);
 	CreateNative("GOKZ_GetTime", Native_GetTime);
 	CreateNative("GOKZ_SetTime", Native_SetTime);
 	CreateNative("GOKZ_InvalidateRun", Native_InvalidateRun);
@@ -432,6 +437,37 @@ public int Native_SetCourse(Handle plugin, int numParams)
 public int Native_GetPaused(Handle plugin, int numParams)
 {
 	return view_as<int>(GetPaused(GetNativeCell(1)));
+}
+
+public int Native_GetHeldInThisRun(Handle plugin, int numParams)
+{
+	return view_as<int>(GetHeldInThisRun(GetNativeCell(1)));
+}
+
+public int Native_GetRunCarriedOver(Handle plugin, int numParams)
+{
+	return view_as<int>(GOKZ_RJ_IsRejoinIfAvailable(GetNativeCell(1)));
+}
+
+public int Native_GetRunHeld(Handle plugin, int numParams)
+{
+	return view_as<int>(GOKZ_RJ_IsHeldIfAvailable(GetNativeCell(1)));
+}
+
+public int Native_GetHeldAccountID(Handle plugin, int numParams)
+{
+	if (GetFeatureStatus(FeatureType_Native, "GOKZ_RJ_GetAccountID") != FeatureStatus_Available)
+	{
+		return 0;
+	}
+	return GOKZ_RJ_GetAccountID(GetNativeCell(1));
+}
+
+public int Native_GetRunHeldOnDisconnect(Handle plugin, int numParams)
+{
+	char reason[128];
+	GetNativeString(2, reason, sizeof(reason));
+	return view_as<int>(GOKZ_RJ_WillHoldIfAvailable(GetNativeCell(1), reason));
 }
 
 public int Native_GetTime(Handle plugin, int numParams)

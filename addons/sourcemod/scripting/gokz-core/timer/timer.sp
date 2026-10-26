@@ -6,9 +6,15 @@ static float lastFalseEndTime[MAXPLAYERS + 1];
 static float lastStartSoundTime[MAXPLAYERS + 1];
 static int lastStartMode[MAXPLAYERS + 1];
 static bool validTime[MAXPLAYERS + 1];
+static bool heldInThisRun[MAXPLAYERS + 1];
 
 
 // =====[ PUBLIC ]=====
+
+int GetTimerStartMode(int client)
+{
+	return lastStartMode[client];
+}
 
 bool GetTimerRunning(int client)
 {
@@ -18,6 +24,11 @@ bool GetTimerRunning(int client)
 bool GetValidTimer(int client)
 {
 	return validTime[client];
+}
+
+bool GetHeldInThisRun(int client)
+{
+	return heldInThisRun[client];
 }
 
 float GetCurrentTime(int client)
@@ -82,6 +93,7 @@ bool TimerStart(int client, int course, bool allowMidair = false, bool playSound
 	currentCourse[client] = course;
 	lastStartMode[client] = GOKZ_GetCoreOption(client, Option_Mode);
 	validTime[client] = true;
+	heldInThisRun[client] = GOKZ_RJ_IsHeldIfAvailable(client);
 	if (playSound)
 	{
 		PlayTimerStartSound(client);
@@ -237,6 +249,11 @@ void OnTeleportToStart_Timer(int client)
 void OnClientDisconnect_Timer(int client)
 {
 	TimerStop(client);
+}
+
+void OnHoldStart_Timer(int client)
+{
+	heldInThisRun[client] = true;
 }
 
 void OnPlayerDeath_Timer(int client)

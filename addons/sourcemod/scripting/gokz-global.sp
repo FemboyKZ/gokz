@@ -316,7 +316,8 @@ public void GOKZ_OnTimerEnd_Post(int client, int course, float time, int telepor
 		gB_InValidRun[client] = true;
 	}
 
-	if (gB_GloballyVerified[client] && gB_InValidRun[client])
+	// Runs that went through a gokz-rejoin hold stay local
+	if (gB_GloballyVerified[client] && gB_InValidRun[client] && !GOKZ_GetHeldInThisRun(client))
 	{
 		SendTime(client, course, time, teleportsUsed);
 	}

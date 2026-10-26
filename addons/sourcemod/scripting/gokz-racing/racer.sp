@@ -324,7 +324,7 @@ bool AbortHostedRace(int client)
 
 bool SendRequest(int host, int target)
 {
-	if (IsFakeClient(target) || target == host || InRace(target)
+	if (IsFakeClient(target) || target == host || InRace(target) || GOKZ_GetRunHeld(target)
 		 || !IsRaceHost(host) || GetRaceInfo(racerRaceID[host], RaceInfo_Status) != RaceStatus_Pending)
 	{
 		return false;

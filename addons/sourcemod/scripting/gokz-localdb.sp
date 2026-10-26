@@ -28,6 +28,7 @@ Database gH_DB = null;
 DatabaseType g_DBType = DatabaseType_None;
 bool gB_ClientSetUp[MAXPLAYERS + 1];
 bool gB_ClientPostAdminChecked[MAXPLAYERS + 1];
+bool gB_WarnedUnverified[MAXPLAYERS + 1];
 bool gB_Cheater[MAXPLAYERS + 1];
 int gI_PBJSCache[MAXPLAYERS + 1][MODE_COUNT][JUMPTYPE_COUNT][JUMPSTATDB_CACHE_COUNT];
 bool gB_MapSetUp;
@@ -120,7 +121,10 @@ public void OnMapEnd()
 
 public void OnClientConnected(int client)
 {
-	gC_RunGUID[client][0] = 0;
+	if (!GOKZ_GetRunCarriedOver(client))
+	{
+		gC_RunGUID[client][0] = 0;
+	}
 }
 
 public void OnClientAuthorized(int client, const char[] auth)
@@ -135,7 +139,8 @@ public void OnClientPostAdminCheck(int client)
 
 	StartCvarTracking(client);
 	
-	if (gB_MapSetUp && GOKZ_GetOption(client, gC_DBOptionNames[DBOption_AutoLoadTimerSetup]) == DBOption_Enabled)
+	if (gB_MapSetUp && GOKZ_GetOption(client, gC_DBOptionNames[DBOption_AutoLoadTimerSetup]) == DBOption_Enabled
+		 && !GOKZ_GetRunCarriedOver(client))
 	{
 		DB_LoadTimerSetup(client);
 	}
@@ -148,7 +153,8 @@ public void GOKZ_DB_OnClientSetup(int client, int steamID, bool cheater)
 
 public void GOKZ_OnOptionsLoaded(int client)
 {
-	if (gB_MapSetUp && gB_ClientPostAdminChecked[client] && GOKZ_GetOption(client, gC_DBOptionNames[DBOption_AutoLoadTimerSetup]) == DBOption_Enabled)
+	if (gB_MapSetUp && gB_ClientPostAdminChecked[client] && GOKZ_GetOption(client, gC_DBOptionNames[DBOption_AutoLoadTimerSetup]) == DBOption_Enabled
+		 && !GOKZ_GetRunCarriedOver(client))
 	{
 		DB_LoadTimerSetup(client);
 	}
@@ -156,9 +162,13 @@ public void GOKZ_OnOptionsLoaded(int client)
 
 public void OnClientDisconnect(int client)
 {
-	gB_ClientSetUp[client] = false;
-	gB_ClientPostAdminChecked[client] = false;
+	if (!GOKZ_GetRunCarriedOver(client))
+	{
+		gB_ClientSetUp[client] = false;
+		gB_ClientPostAdminChecked[client] = false;
+	}
 	StopCvarTracking(client);
+	gB_WarnedUnverified[client] = false;
 }
 
 public void GOKZ_OnCourseRegistered(int course)
@@ -190,6 +200,15 @@ public Action GOKZ_OnTimerStart(int client, int course)
 		gI_RunCounter);
 
 	return Plugin_Continue;
+}
+
+public void GOKZ_OnTimerStart_Post(int client, int course)
+{
+	if (!gB_WarnedUnverified[client] && !IsFakeClient(client) && GetSteamAccountID(client) == 0)
+	{
+		gB_WarnedUnverified[client] = true;
+		GOKZ_PrintToChat(client, true, "%t", "Unverified Run Warning");
+	}
 }
 
 public void GOKZ_OnTimerEnd_Post(int client, int course, float time, int teleportsUsed)

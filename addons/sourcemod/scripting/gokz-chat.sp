@@ -225,7 +225,11 @@ void PrintConnectMessage(int client)
 		return;
 	}
 	
-	GOKZ_PrintToChatAll(false, "%t", "Client Connection Message", client);
+	// gokz-rejoin announces those itself
+	if (!GOKZ_GetRunCarriedOver(client))
+	{
+		GOKZ_PrintToChatAll(false, "%t", "Client Connection Message", client);
+	}
 }
 
 void PrintDisconnectMessage(int client, Event event) // Hooked to player_disconnect event
@@ -237,7 +241,10 @@ void PrintDisconnectMessage(int client, Event event) // Hooked to player_disconn
 	
 	char reason[128];
 	event.GetString("reason", reason, sizeof(reason));
-	GOKZ_PrintToChatAll(false, "%t", "Client Disconnection Message", client, reason);
+	if (!GOKZ_GetRunHeldOnDisconnect(client, reason))
+	{
+		GOKZ_PrintToChatAll(false, "%t", "Client Disconnection Message", client, reason);
+	}
 }
 
 

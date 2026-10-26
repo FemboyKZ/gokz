@@ -143,8 +143,18 @@ public void OnLibraryRemoved(const char[] name)
 
 public void OnClientPutInServer(int client)
 {
-	OnClientPutInServer_BhopTracking(client);
-	OnClientPutInServer_BhopTrackingV2(client);
+	// Command numbers restart with each connection
+	gI_LastOriginTeleportCmdNum[client] = 0;
+	if (GOKZ_GetRunCarriedOver(client))
+	{
+		OnRejoin_BhopTracking(client);
+		OnRejoin_BhopTrackingV2(client);
+	}
+	else
+	{
+		OnClientPutInServer_BhopTracking(client);
+		OnClientPutInServer_BhopTrackingV2(client);
+	}
 	HookClientEvents(client);
 }
 

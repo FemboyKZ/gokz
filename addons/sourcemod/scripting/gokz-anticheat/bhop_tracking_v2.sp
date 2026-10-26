@@ -102,6 +102,12 @@ void OnClientPutInServer_BhopTrackingV2(int client)
 	ResetBhopStatsV2(client);
 }
 
+// Keeps the samples, so a rejoin cannot clear them
+void OnRejoin_BhopTrackingV2(int client)
+{
+	ResetBhopCmdnumsV2(client);
+}
+
 void OnPlayerRunCmdPost_BhopTrackingV2(int client, int buttons, int cmdnum)
 {
 	if (gCV_sv_autobunnyhopping.BoolValue)
@@ -319,13 +325,19 @@ static void ResetBhopStatsV2(int client)
     gI_ButtonsIndexV2[client] = 0;
 	gI_BhopCountV2[client] = 0;
 	gI_BhopIndexV2[client] = 0;
+	gB_SuspectedV2[client] = false;
+	ResetBhopCmdnumsV2(client);
+}
+
+// State tied to the connection's command numbers
+static void ResetBhopCmdnumsV2(int client)
+{
 	gI_BhopLastTakeoffCmdnumV2[client] = 0;
 	gI_BhopLastRecordedBhopCmdnumV2[client] = 0;
 	gB_BhopPostJumpInputsPendingV2[client] = false;
 	gB_LastLandingWasValidV2[client] = false;
 	gB_BindExceptionPendingV2[client] = false;
 	gB_BindExceptionPostPendingV2[client] = false;
-	gB_SuspectedV2[client] = false;
 }
 
 // V2-specific suspect function that uses local/SBPP bans only

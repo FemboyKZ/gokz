@@ -105,6 +105,12 @@ void OnClientPutInServer_BhopTracking(int client)
 	ResetBhopStats(client);
 }
 
+// Keeps the samples, so a rejoin cannot clear them
+void OnRejoin_BhopTracking(int client)
+{
+	ResetBhopCmdnums(client);
+}
+
 void OnPlayerRunCmdPost_BhopTracking(int client, int buttons, int cmdnum)
 {
 	if (gCV_sv_autobunnyhopping.BoolValue)
@@ -284,6 +290,12 @@ static void ResetBhopStats(int client)
 	gI_ButtonsIndex[client] = 0;
 	gI_BhopCount[client] = 0;
 	gI_BhopIndex[client] = 0;
+	ResetBhopCmdnums(client);
+}
+
+// State tied to the connection's command numbers
+static void ResetBhopCmdnums(int client)
+{
 	gI_BhopLastTakeoffCmdnum[client] = 0;
 	gI_BhopLastRecordedBhopCmdnum[client] = 0;
 	gB_BhopPostJumpInputsPending[client] = false;

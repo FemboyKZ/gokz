@@ -49,16 +49,16 @@ void OnClientPutInServer_Recording(int client)
 void OnClientAuthorized_Recording(int client)
 {
 	// Apparently the client isn't valid yet here, so we can't check for that!
-	if(!IsFakeClient(client))
+	if(!GOKZ_IsBot(client))
 	{
 		// Create directory path for player if not exists
 		char replayPath[PLATFORM_MAX_PATH];
-		BuildPath(Path_SM, replayPath, sizeof(replayPath), "%s/%d", RP_DIRECTORY_JUMPS, GetSteamAccountID(client));
+		BuildPath(Path_SM, replayPath, sizeof(replayPath), "%s/%d", RP_DIRECTORY_JUMPS, GOKZ_GetSteamAccountID(client));
 		if (!DirExists(replayPath))
 		{
 			CreateDirectory(replayPath, 511);
 		}
-		BuildPath(Path_SM, replayPath, sizeof(replayPath), "%s/%d/%s", RP_DIRECTORY_JUMPS, GetSteamAccountID(client), RP_DIRECTORY_BLOCKJUMPS);
+		BuildPath(Path_SM, replayPath, sizeof(replayPath), "%s/%d/%s", RP_DIRECTORY_JUMPS, GOKZ_GetSteamAccountID(client), RP_DIRECTORY_BLOCKJUMPS);
 		if (!DirExists(replayPath))
 		{
 			CreateDirectory(replayPath, 511);
@@ -76,7 +76,7 @@ void OnClientDisconnect_Recording(int client)
 	}
 
 	// Trigger all timers early
-	if(!IsFakeClient(client))
+	if(!GOKZ_IsBot(client))
 	{
 		if (runningRunBreatherTimer[client] != INVALID_HANDLE)
 		{
@@ -99,7 +99,7 @@ void OnClientDisconnect_Recording(int client)
 
 void OnPlayerRunCmd_Recording(int client)
 {
-	if (!IsValidClient(client) || IsFakeClient(client) || !IsPlayerAlive(client) || recordingPaused[client])
+	if (!IsValidClient(client) || GOKZ_IsBot(client) || !IsPlayerAlive(client) || recordingPaused[client])
 	{
 		return;
 	}
@@ -108,7 +108,7 @@ void OnPlayerRunCmd_Recording(int client)
 
 void Hook_PlayerPostThinkPost_Recording(int client)
 {
-	if (!IsValidClient(client) || IsFakeClient(client) || !IsPlayerAlive(client) || recordingPaused[client])
+	if (!IsValidClient(client) || GOKZ_IsBot(client) || !IsPlayerAlive(client) || recordingPaused[client])
 	{
 		return;
 	}
@@ -119,7 +119,7 @@ void Hook_PlayerPostThinkPost_Recording(int client)
 
 void OnPlayerRunCmdPost_Recording(int client, int buttons, int tickCount, const float vel[3], const int mouse[2])
 {
-	if (!IsValidClient(client) || IsFakeClient(client) || !IsPlayerAlive(client) || recordingPaused[client] || !movementProcessed[client])
+	if (!IsValidClient(client) || GOKZ_IsBot(client) || !IsPlayerAlive(client) || recordingPaused[client] || !movementProcessed[client])
 	{
 		return;
 	}
@@ -133,7 +133,8 @@ void OnPlayerRunCmdPost_Recording(int client, int buttons, int tickCount, const 
 	Movement_GetVelocity(client, tickData.velocity);
 	Movement_GetEyeAngles(client, tickData.angles);
 	tickData.flags = EncodePlayerFlags(client, buttons, tickCount);
-	tickData.packetsPerSecond = GetClientAvgPackets(client, NetFlow_Incoming);
+	// SourceMod has no network info for bots, held runs included
+	tickData.packetsPerSecond = IsFakeClient(client) ? 0.0 : GetClientAvgPackets(client, NetFlow_Incoming);
 	tickData.laggedMovementValue = GetEntPropFloat(client, Prop_Send, "m_flLaggedMovementValue");
 	tickData.buttonsForced = GetEntProp(client, Prop_Data, "m_afButtonForced");
 
@@ -390,7 +391,7 @@ public Action SaveJump(Handle timer, DataPack data)
 
 bool StartJumpStatReplaySave(int client, const char[] guid, int mode, int style, int jumptype, float distance, int block, int strafes, float sync, float pre, float max, int airtime)
 {
-	if (!IsValidClient(client) || IsFakeClient(client) || GetSteamAccountID(client) == 0)
+	if (!IsValidClient(client) || GOKZ_IsBot(client) || GOKZ_GetSteamAccountID(client) == 0)
 	{
 		return false;
 	}
@@ -487,13 +488,16 @@ static void ClearClientRecordingState(int client)
 
 static void StartRunRecording(int client)
 {
-	if (IsFakeClient(client))
+	if (GOKZ_IsBot(client))
 	{
 		return;
 	}
 
-	QueryClientConVar(client, "sensitivity", SensitivityCheck, client);
-	QueryClientConVar(client, "m_yaw", MYAWCheck, client);
+	if (!IsFakeClient(client))
+	{
+		QueryClientConVar(client, "sensitivity", SensitivityCheck, client);
+		QueryClientConVar(client, "m_yaw", MYAWCheck, client);
+	}
 	
 	DiscardRecording(client);
 	ResumeRecording(client);
@@ -581,7 +585,7 @@ static bool SaveRecordingOfRun(int client, int mode, int style, int course, floa
 	delete file;
 
 	LogMessage("Saved run replay '%s' (player: %d, map: %s, course: %d, time: %f, teleports: %d)",
-		guid, GetSteamAccountID(client), generalHeader.mapName, course, time, teleportsUsed);
+		guid, GOKZ_GetSteamAccountID(client), generalHeader.mapName, course, time, teleportsUsed);
 
 	Call_OnReplaySaved(client, ReplayType_Run, gC_CurrentMap, course,
 		GOKZ_GetTimeTypeEx(teleportsUsed), time, replayPath);
@@ -641,7 +645,7 @@ static bool SaveRecordingOfJump(int client, int mode, int style, int jumptype, f
 	FillJumpHeader(jumpHeader, jumptype, distance, block, strafes, sync, pre, max, airtime);
 
 	// Make sure the client is authenticated
-	if (GetSteamAccountID(client) == 0)
+	if (GOKZ_GetSteamAccountID(client) == 0)
 	{
 		LogError("Failed to save jump, client is not authenticated.");
 		return false;
@@ -684,7 +688,7 @@ static bool SaveRecordingOfJumpToPath(int client, const char[] replayPath, int m
 		return false;
 	}
 
-	if (GetSteamAccountID(client) == 0)
+	if (GOKZ_GetSteamAccountID(client) == 0)
 	{
 		LogError("Failed to save jumpstat replay, client is not authenticated.");
 		return false;
@@ -724,7 +728,7 @@ static void FillGeneralHeader(GeneralReplayHeader generalHeader, int client, int
 	generalHeader.serverIP = FindConVar("hostip").IntValue;
 	generalHeader.timestamp = GetTime();
 	GetClientName(client, generalHeader.playerAlias, sizeof(GeneralReplayHeader::playerAlias));
-	generalHeader.playerSteamID = GetSteamAccountID(client);
+	generalHeader.playerSteamID = GOKZ_GetSteamAccountID(client);
 	generalHeader.mode = mode;
 	generalHeader.style = style;
 	generalHeader.playerSensitivity = playerSensitivity[client];
@@ -874,7 +878,7 @@ static void FormatCheaterReplayPath(char[] buffer, int maxlength, int client, in
 	BuildPath(Path_SM, buffer, maxlength,
 		"%s/%d_%s_%d_%s_%s.%s",
 		RP_DIRECTORY_CHEATERS,
-		GetSteamAccountID(client),
+		GOKZ_GetSteamAccountID(client),
 		gC_CurrentMap,
 		GetTime(),
 		gC_ModeNamesShort[mode], 
@@ -887,7 +891,7 @@ static void FormatJumpReplayPath(char[] buffer, int maxlength, int client, int j
 	BuildPath(Path_SM, buffer, maxlength,
 		"%s/%d/%d_%s_%s.%s",
 		RP_DIRECTORY_JUMPS,
-		GetSteamAccountID(client),
+		GOKZ_GetSteamAccountID(client),
 		jumpType,
 		gC_ModeNamesShort[mode],
 		gC_StyleNamesShort[style],
@@ -899,7 +903,7 @@ static void FormatBlockJumpReplayPath(char[] buffer, int maxlength, int client, 
 	BuildPath(Path_SM, buffer, maxlength,
 		"%s/%d/%s/%d_%d_%s_%s.%s",
 		RP_DIRECTORY_JUMPS,
-		GetSteamAccountID(client),
+		GOKZ_GetSteamAccountID(client),
 		RP_DIRECTORY_BLOCKJUMPS,
 		jumpType,
 		block,
@@ -1003,7 +1007,7 @@ static void CreateReplaysDirectory()
 
 public void MYAWCheck(QueryCookie cookie, int client, ConVarQueryResult result, const char[] cvarName, const char[] cvarValue, any value)
 {
-	if (IsValidClient(client) && !IsFakeClient(client))
+	if (IsValidClient(client) && !GOKZ_IsBot(client))
 	{
 		playerMYaw[client] = StringToFloat(cvarValue);
 	}
@@ -1011,7 +1015,7 @@ public void MYAWCheck(QueryCookie cookie, int client, ConVarQueryResult result, 
 
 public void SensitivityCheck(QueryCookie cookie, int client, ConVarQueryResult result, const char[] cvarName, const char[] cvarValue, any value)
 {
-	if (IsValidClient(client) && !IsFakeClient(client))
+	if (IsValidClient(client) && !GOKZ_IsBot(client))
 	{
 		playerSensitivity[client] = StringToFloat(cvarValue);
 	}

@@ -1,5 +1,6 @@
 static StringMap optionData;
 static StringMap optionDescriptions;
+static int modePickedBeforeLoad[MAXPLAYERS + 1];
 
 
 
@@ -209,6 +210,20 @@ void OnPluginStart_Options()
 
 void OnClientCookiesCached_Options(int client)
 {
+	// The load swaps in the saved values without an option change, which would switch a run's or the player's own mode under them
+	int keptMode = -1;
+	if (IsClientInGame(client))
+	{
+		keptMode = GetTimerRunning(client) ? GetTimerStartMode(client) : modePickedBeforeLoad[client];
+	}
+	if (keptMode != -1)
+	{
+		char value[16];
+		IntToString(keptMode, value, sizeof(value));
+		Cookie cookie = GetOptionProp(gC_CoreOptionNames[Option_Mode], OptionProp_Cookie);
+		cookie.Set(client, value);
+	}
+
 	StringMapSnapshot optionDataSnapshot = optionData.Snapshot();
 	char option[GOKZ_OPTION_MAX_NAME_LENGTH];
 	
@@ -223,16 +238,34 @@ void OnClientCookiesCached_Options(int client)
 	Call_GOKZ_OnOptionsLoaded(client);
 }
 
+// Options live in clientprefs cookies, which SourceMod's disconnect in the handover dropped
+void OnRejoin_Options(int client)
+{
+	if (GetTimerRunning(client))
+	{
+		char value[16];
+		IntToString(GetTimerStartMode(client), value, sizeof(value));
+		Cookie cookie = GetOptionProp(gC_CoreOptionNames[Option_Mode], OptionProp_Cookie);
+		cookie.Set(client, value);
+	}
+}
+
 void OnClientPutInServer_Options(int client)
 {
 	if (!GetModeLoaded(GOKZ_GetCoreOption(client, Option_Mode)))
 	{
 		GOKZ_SetCoreOption(client, Option_Mode, GetALoadedMode());
 	}
+	modePickedBeforeLoad[client] = -1;
 }
 
 void OnOptionChanged_Options(int client, Option option, int newValue)
 {
+	if (option == Option_Mode && !AreClientCookiesCached(client))
+	{
+		modePickedBeforeLoad[client] = newValue;
+	}
+
 	if (option == Option_Mode && !GetModeLoaded(newValue))
 	{
 		GOKZ_PrintToChat(client, true, "%t", "Mode Not Available", newValue);

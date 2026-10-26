@@ -165,12 +165,11 @@ public Action Timer_PendingBotTimedOut(Handle timer, int bot)
 // Passes the current state of the replay into the HUDInfo struct
 void GetPlaybackState(int client, HUDInfo info)
 {
-	int bot, i;
-	for(i = 0; i < RP_MAX_BOTS; i++)
+	int bot = GetBotFromClient(client);
+	if (bot == -1)
 	{
-		bot = botClient[i] == client ? i : bot;
+		return;
 	}
-	if (i == RP_MAX_BOTS + 1) return;
 	
 	if (playbackTickData[bot] == INVALID_HANDLE)
 	{
@@ -446,7 +445,7 @@ float GetPlaybackTime(int bot)
 
 void OnClientPutInServer_Playback(int client)
 {
-	if (!IsFakeClient(client) || IsClientSourceTV(client))
+	if (!GOKZ_IsBot(client) || IsClientSourceTV(client))
 	{
 		return;
 	}
@@ -504,7 +503,7 @@ void OnClientDisconnect_Playback(int client)
 
 void OnPlayerRunCmd_Playback(int client, int &buttons, float vel[3], float angles[3])
 {
-	if (!IsFakeClient(client))
+	if (!GOKZ_IsBot(client))
 	{
 		return;
 	}

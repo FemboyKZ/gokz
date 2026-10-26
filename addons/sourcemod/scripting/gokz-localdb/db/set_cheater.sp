@@ -12,6 +12,10 @@ void DB_SetCheater(int cheaterClient, bool cheater)
 	}
 	
 	gB_Cheater[cheaterClient] = cheater;
+	if (GetSteamAccountID(cheaterClient) == 0)
+	{
+		return;
+	}
 	
 	DataPack data = new DataPack();
 	data.WriteCell(-1);

@@ -53,12 +53,18 @@ public void OnPluginStart()
 
 public void OnClientPutInServer(int client)
 {
-	OnClientPutInServer_Racer(client);
+	if (!GOKZ_GetRunCarriedOver(client))
+	{
+		OnClientPutInServer_Racer(client);
+	}
 }
 
 public void OnClientDisconnect(int client)
 {
-	OnClientDisconnect_Racer(client);
+	if (!GOKZ_GetRunCarriedOver(client))
+	{
+		OnClientDisconnect_Racer(client);
+	}
 }
 
 public Action GOKZ_OnTimerStart(int client, int course)

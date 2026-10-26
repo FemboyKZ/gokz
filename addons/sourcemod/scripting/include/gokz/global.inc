@@ -228,6 +228,13 @@ native bool GOKZ_GL_GetMapValid();
  */
 native bool GOKZ_GL_GetPlayerValid(int client);
 
+/**
+ * Gets whether gokz-global refuses runs that went through a gokz-rejoin hold.
+ *
+ * @return				True.
+ */
+native bool GOKZ_GL_SkipsHeldRuns();
+
 
 
 // =====[ STOCKS ]=====
@@ -312,6 +319,7 @@ public void __pl_gokz_global_SetNTVOptional()
 	MarkNativeAsOptional("GOKZ_GL_GetSettingsEnforcerValid");
 	MarkNativeAsOptional("GOKZ_GL_GetMapValid");
 	MarkNativeAsOptional("GOKZ_GL_GetPlayerValid");
+	MarkNativeAsOptional("GOKZ_GL_SkipsHeldRuns");
 	MarkNativeAsOptional("GOKZ_GL_GetPoints");
 	MarkNativeAsOptional("GOKZ_GL_GetMapPoints");
 	MarkNativeAsOptional("GOKZ_GL_GetRankPoints");

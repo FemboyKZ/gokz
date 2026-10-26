@@ -27,6 +27,10 @@ public void OnLanding_SaveJumpstat(Jump jump)
 	char query[1024];
 	DataPack data;
 	int steamid = GetSteamAccountID(jump.jumper);
+	if (steamid == 0)
+	{
+		return;
+	}
 	int int_dist = RoundToNearest(jump.distance * GOKZ_DB_JS_DISTANCE_PRECISION);
 	
 	// Non-block

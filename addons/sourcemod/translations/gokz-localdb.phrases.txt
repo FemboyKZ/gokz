@@ -1,5 +1,17 @@
 "Phrases"
 {
+	"Unverified Run Warning"
+	{
+		"en"		"{grey}Steam has not verified you yet. Your time is only saved if it does before you finish."
+	}
+	"Time Not Saved (Unverified)"
+	{
+		"en"		"{grey}Your time was not saved: Steam has not verified you yet."
+	}
+	"Timer Setup Unavailable (Unverified)"
+	{
+		"en"		"{grey}Timer setups can't be saved or loaded until Steam verifies you."
+	}
 	"Block"
 	{
 		"en"	"Block"

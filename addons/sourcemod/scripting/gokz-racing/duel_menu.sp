@@ -443,7 +443,7 @@ static int DuelOpponentMenuAddItems(int client, Menu menu)
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		char display[MAX_NAME_LENGTH];
-		if (i != client && IsClientInGame(i) && !IsFakeClient(i) && !InRace(i))
+		if (i != client && IsClientInGame(i) && !IsFakeClient(i) && !InRace(i) && !GOKZ_GetRunHeld(i))
 		{
 			FormatEx(display, sizeof(display), "%N", i);
 			menu.AddItem(IntToStringEx(GetClientUserId(i)), display);
