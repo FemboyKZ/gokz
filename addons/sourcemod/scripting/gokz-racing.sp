@@ -53,23 +53,12 @@ public void OnPluginStart()
 
 public void OnClientPutInServer(int client)
 {
-	if (!GOKZ_GetRunCarriedOver(client))
-	{
-		OnClientPutInServer_Racer(client);
-	}
+	OnClientPutInServer_Racer(client);
 }
 
 public void OnClientDisconnect(int client)
 {
-	if (!GOKZ_GetRunCarriedOver(client))
-	{
-		OnClientDisconnect_Racer(client);
-	}
-	// The run keeps its slot, but the race does not wait for it
-	else if (GOKZ_GetRunHeld(client))
-	{
-		LeaveRace(client);
-	}
+	OnClientDisconnect_Racer(client);
 }
 
 public Action GOKZ_OnTimerStart(int client, int course)

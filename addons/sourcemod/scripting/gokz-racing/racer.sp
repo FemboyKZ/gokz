@@ -324,7 +324,7 @@ bool AbortHostedRace(int client)
 
 bool SendRequest(int host, int target)
 {
-	if (IsFakeClient(target) || target == host || InRace(target) || GOKZ_GetRunHeld(target)
+	if (IsFakeClient(target) || target == host || InRace(target)
 		 || !IsRaceHost(host) || GetRaceInfo(racerRaceID[host], RaceInfo_Status) != RaceStatus_Pending)
 	{
 		return false;
@@ -422,12 +422,6 @@ void OnClientPutInServer_Racer(int client)
 
 void OnClientDisconnect_Racer(int client)
 {
-	LeaveRace(client);
-	ResetRacer(client);
-}
-
-void LeaveRace(int client)
-{
 	// Abort if player was the host of the race, else surrender
 	if (InRace(client))
 	{
@@ -440,4 +434,6 @@ void LeaveRace(int client)
 			SurrenderRacer(client);
 		}
 	}
+	
+	ResetRacer(client);
 } 
