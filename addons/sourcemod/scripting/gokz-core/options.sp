@@ -234,6 +234,7 @@ void OnClientCookiesCached_Options(int client)
 	}
 	
 	delete optionDataSnapshot;
+	modePickedBeforeLoad[client] = -1;
 	
 	Call_GOKZ_OnOptionsLoaded(client);
 }
