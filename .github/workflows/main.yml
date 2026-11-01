@@ -43,12 +43,10 @@ jobs:
           mkdir sm
           cd sm
           wget -q -O - "http://sourcemod.net/latest.php?os=linux&version=${{env.SM_VERSION}}" | tar x -zf -
-          cp -r ../addons .
-          cd ./addons/sourcemod/scripting
-          for file in gokz-*.sp; do ./spcomp $file; done;
-          cd ../../../../
+          cd ..
+          make SPCOMP=sm/addons/sourcemod/scripting/spcomp
           mkdir -p addons/sourcemod/plugins
-          mv sm/addons/sourcemod/scripting/gokz-*.smx addons/sourcemod/plugins
+          mv addons/sourcemod/scripting/gokz-*.smx addons/sourcemod/plugins
           
       - name: upload-full
         uses: actions/upload-artifact@v7
