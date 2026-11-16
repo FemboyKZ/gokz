@@ -318,6 +318,62 @@ public void GOKZ_OnCountedTeleport_Post(int client)
 	ResetClient(client);
 }
 
+public Action GOKZ_OnGetModeState(int client, int mode, any[] state)
+{
+	if (mode != Mode_SimpleKZ)
+	{
+		return Plugin_Continue;
+	}
+
+	int i = 0;
+	state[i++] = gF_PSBonusSpeed[client];
+	state[i++] = gF_PSVelMod[client];
+	state[i++] = gF_PSVelModLanding[client];
+	state[i++] = gB_PSTurningLeft[client];
+	state[i++] = gF_PSTurnRate[client];
+	state[i++] = gI_PSTicksSinceIncrement[client];
+	// The last usercmd's jump counts before OnPlayerRunCmdPost records it.
+	int lastJump = GetClientButtons(client) & IN_JUMP ? gI_Cmdnum[client] : gI_LastJumpButtonCmdnum[client];
+	state[i++] = lastJump - gI_Cmdnum[client];
+	state[i++] = gI_OldButtons[client];
+	state[i++] = gI_OldFlags[client];
+	state[i++] = gB_OldOnGround[client];
+	for (int j = 0; j < 3; j++)
+	{
+		state[i++] = gF_OldOrigin[client][j];
+		state[i++] = gF_OldAngles[client][j];
+		state[i++] = gF_OldVelocity[client][j];
+	}
+	return Plugin_Handled;
+}
+
+public Action GOKZ_OnSetModeState(int client, int mode, const any[] state)
+{
+	if (mode != Mode_SimpleKZ)
+	{
+		return Plugin_Continue;
+	}
+
+	int i = 0;
+	gF_PSBonusSpeed[client] = state[i++];
+	gF_PSVelMod[client] = state[i++];
+	gF_PSVelModLanding[client] = state[i++];
+	gB_PSTurningLeft[client] = state[i++];
+	gF_PSTurnRate[client] = state[i++];
+	gI_PSTicksSinceIncrement[client] = state[i++];
+	gI_LastJumpButtonCmdnum[client] = gI_Cmdnum[client] + state[i++];
+	gI_OldButtons[client] = state[i++];
+	gI_OldFlags[client] = state[i++];
+	gB_OldOnGround[client] = state[i++];
+	for (int j = 0; j < 3; j++)
+	{
+		gF_OldOrigin[client][j] = state[i++];
+		gF_OldAngles[client][j] = state[i++];
+		gF_OldVelocity[client][j] = state[i++];
+	}
+	return Plugin_Handled;
+}
+
 
 
 // =====[ GENERAL ]=====

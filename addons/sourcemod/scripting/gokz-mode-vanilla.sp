@@ -217,6 +217,17 @@ public void GOKZ_OnOptionChanged(int client, const char[] option, any newValue)
 	}
 }
 
+// Vanilla keeps nothing between ticks: its state is empty.
+public Action GOKZ_OnGetModeState(int client, int mode, any[] state)
+{
+	return mode == Mode_Vanilla ? Plugin_Handled : Plugin_Continue;
+}
+
+public Action GOKZ_OnSetModeState(int client, int mode, const any[] state)
+{
+	return mode == Mode_Vanilla ? Plugin_Handled : Plugin_Continue;
+}
+
 
 
 // =====[ GENERAL ]=====

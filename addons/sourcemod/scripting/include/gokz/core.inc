@@ -221,6 +221,7 @@ enum TriggerType
 #define GOKZ_CHECKPOINT_VERSION 2
 #define GOKZ_MAX_CHECKPOINTS 2048
 #define GOKZ_MAX_COURSES 100
+#define GOKZ_MODE_STATE_SIZE 32
 
 #define GOKZ_BHOP_NO_CHECKPOINT_TIME 0.15
 #define GOKZ_MULT_NO_CHECKPOINT_TIME 0.11
@@ -845,6 +846,26 @@ forward void GOKZ_OnModeLoaded(int mode);
 forward void GOKZ_OnModeUnloaded(int mode);
 
 /**
+ * Called when GOKZ_GetModeState asks a mode plugin for a player's state.
+ *
+ * @param client		Client index.
+ * @param mode			Player's mode.
+ * @param state			Buffer of GOKZ_MODE_STATE_SIZE cells to copy the state into.
+ * @return				Plugin_Handled if the state was copied.
+ */
+forward Action GOKZ_OnGetModeState(int client, int mode, any[] state);
+
+/**
+ * Called when GOKZ_SetModeState asks a mode plugin to restore a player's state.
+ *
+ * @param client		Client index.
+ * @param mode			Player's mode.
+ * @param state			State copied in GOKZ_OnGetModeState.
+ * @return				Plugin_Handled if the state was restored.
+ */
+forward Action GOKZ_OnSetModeState(int client, int mode, const any[] state);
+
+/**
  * Called when a plugin other than gokz-core calls a native 
  * that may affect a player's timer or teleport count in 
  * their favour e.g. GOKZ_StartTimer, GOKZ_EndTimer,
@@ -933,6 +954,27 @@ native void GOKZ_SetModeLoaded(int mode, bool loaded, int version = -1);
  * @return				Number of loaded modes.
  */
 native int GOKZ_GetLoadedModeCount();
+
+/**
+ * Gets what a player's mode keeps between ticks, such as prestrafe, to restore it later with GOKZ_SetModeState.
+ *
+ * @param client		Client index.
+ * @param state			Buffer to store the state in.
+ * @param size			Size of the buffer, must be GOKZ_MODE_STATE_SIZE.
+ * @return				Whether the player's mode copied its state.
+ */
+native bool GOKZ_GetModeState(int client, any[] state, int size = GOKZ_MODE_STATE_SIZE);
+
+/**
+ * Sets a player's mode state from GOKZ_GetModeState. Call it between the player's usercmds.
+ *
+ * @param client		Client index.
+ * @param mode			Mode the state was taken in.
+ * @param state			State to set.
+ * @param size			Size of the state, must be GOKZ_MODE_STATE_SIZE.
+ * @return				Whether the state was set, false if the player isn't in that mode.
+ */
+native bool GOKZ_SetModeState(int client, int mode, const any[] state, int size = GOKZ_MODE_STATE_SIZE);
 
 /**
  * Sets the player's current mode.
@@ -1851,6 +1893,8 @@ public void __pl_gokz_core_SetNTVOptional()
 	MarkNativeAsOptional("GOKZ_GetModeVersion");
 	MarkNativeAsOptional("GOKZ_SetModeLoaded");
 	MarkNativeAsOptional("GOKZ_GetLoadedModeCount");
+	MarkNativeAsOptional("GOKZ_GetModeState");
+	MarkNativeAsOptional("GOKZ_SetModeState");
 	MarkNativeAsOptional("GOKZ_SetMode");
 	MarkNativeAsOptional("GOKZ_GetOptionsTopMenu");
 	MarkNativeAsOptional("GOKZ_GetCourseRegistered");

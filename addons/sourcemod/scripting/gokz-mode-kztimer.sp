@@ -311,6 +311,52 @@ public void GOKZ_OnCountedTeleport_Post(int client)
 	ResetPrestrafeVelMod(player);
 }
 
+public Action GOKZ_OnGetModeState(int client, int mode, any[] state)
+{
+	if (mode != Mode_KZTimer)
+	{
+		return Plugin_Continue;
+	}
+
+	int i = 0;
+	state[i++] = gF_PreVelMod[client];
+	// An age: engine time keeps running while the state is stored.
+	state[i++] = GetEngineTime() - gF_PreVelModLastChange[client];
+	state[i++] = gF_RealPreVelMod[client];
+	state[i++] = gI_PreTickCounter[client];
+	state[i++] = gI_OldButtons[client];
+	state[i++] = gI_OldFlags[client];
+	state[i++] = gB_OldOnGround[client];
+	for (int j = 0; j < 3; j++)
+	{
+		state[i++] = gF_OldVelocity[client][j];
+	}
+	return Plugin_Handled;
+}
+
+public Action GOKZ_OnSetModeState(int client, int mode, const any[] state)
+{
+	if (mode != Mode_KZTimer)
+	{
+		return Plugin_Continue;
+	}
+
+	int i = 0;
+	gF_PreVelMod[client] = state[i++];
+	float age = state[i++];
+	gF_PreVelModLastChange[client] = GetEngineTime() - age;
+	gF_RealPreVelMod[client] = state[i++];
+	gI_PreTickCounter[client] = state[i++];
+	gI_OldButtons[client] = state[i++];
+	gI_OldFlags[client] = state[i++];
+	gB_OldOnGround[client] = state[i++];
+	for (int j = 0; j < 3; j++)
+	{
+		gF_OldVelocity[client][j] = state[i++];
+	}
+	return Plugin_Handled;
+}
+
 
 
 // =====[ GENERAL ]=====
