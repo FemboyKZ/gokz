@@ -850,7 +850,8 @@ forward void GOKZ_OnModeUnloaded(int mode);
  *
  * @param client		Client index.
  * @param mode			Player's mode.
- * @param state			Buffer of GOKZ_MODE_STATE_SIZE cells to copy the state into.
+ * @param state			Buffer of GOKZ_MODE_STATE_SIZE - 1 cells to copy the state into.
+ *						Put the layout's version first, so a later version of the plugin can tell how to read it.
  * @return				Plugin_Handled if the state was copied.
  */
 forward Action GOKZ_OnGetModeState(int client, int mode, any[] state);
@@ -861,7 +862,7 @@ forward Action GOKZ_OnGetModeState(int client, int mode, any[] state);
  * @param client		Client index.
  * @param mode			Player's mode.
  * @param state			State copied in GOKZ_OnGetModeState.
- * @return				Plugin_Handled if the state was restored.
+ * @return				Plugin_Handled if the state was restored, not for a layout version the plugin can't read.
  */
 forward Action GOKZ_OnSetModeState(int client, int mode, const any[] state);
 
@@ -957,9 +958,10 @@ native int GOKZ_GetLoadedModeCount();
 
 /**
  * Gets what a player's mode keeps between ticks, such as prestrafe, to restore it later with GOKZ_SetModeState.
+ * Call it between the player's usercmds or in OnPlayerRunCmdPost.
  *
  * @param client		Client index.
- * @param state			Buffer to store the state in.
+ * @param state			Buffer to store the state in. The first cell is the mode it was taken in.
  * @param size			Size of the buffer, must be GOKZ_MODE_STATE_SIZE.
  * @return				Whether the player's mode copied its state.
  */
@@ -969,12 +971,12 @@ native bool GOKZ_GetModeState(int client, any[] state, int size = GOKZ_MODE_STAT
  * Sets a player's mode state from GOKZ_GetModeState. Call it between the player's usercmds.
  *
  * @param client		Client index.
- * @param mode			Mode the state was taken in.
  * @param state			State to set.
  * @param size			Size of the state, must be GOKZ_MODE_STATE_SIZE.
- * @return				Whether the state was set, false if the player isn't in that mode.
+ * @return				Whether the state was set: false if the player isn't in the mode it was taken in,
+ *						or the mode can't read its version.
  */
-native bool GOKZ_SetModeState(int client, int mode, const any[] state, int size = GOKZ_MODE_STATE_SIZE);
+native bool GOKZ_SetModeState(int client, const any[] state, int size = GOKZ_MODE_STATE_SIZE);
 
 /**
  * Sets the player's current mode.

@@ -27,6 +27,7 @@ public Plugin myinfo =
 };
 
 #define MODE_VERSION 2172
+#define MODE_STATE_VERSION 1 // Layout of GOKZ_OnGetModeState's state
 #define DUCK_SPEED_NORMAL 8.0
 #define PRE_VELMOD_MAX 1.104 // Calculated 276/250
 #define PERF_SPEED_CAP 380.0
@@ -319,6 +320,7 @@ public Action GOKZ_OnGetModeState(int client, int mode, any[] state)
 	}
 
 	int i = 0;
+	state[i++] = MODE_STATE_VERSION;
 	state[i++] = gF_PreVelMod[client];
 	// An age: engine time keeps running while the state is stored.
 	state[i++] = GetEngineTime() - gF_PreVelModLastChange[client];
@@ -336,12 +338,12 @@ public Action GOKZ_OnGetModeState(int client, int mode, any[] state)
 
 public Action GOKZ_OnSetModeState(int client, int mode, const any[] state)
 {
-	if (mode != Mode_KZTimer)
+	if (mode != Mode_KZTimer || state[0] != MODE_STATE_VERSION)
 	{
 		return Plugin_Continue;
 	}
 
-	int i = 0;
+	int i = 1;
 	gF_PreVelMod[client] = state[i++];
 	float age = state[i++];
 	gF_PreVelModLastChange[client] = GetEngineTime() - age;

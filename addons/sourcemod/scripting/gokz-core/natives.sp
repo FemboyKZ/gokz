@@ -116,13 +116,13 @@ public int Native_GetModeState(Handle plugin, int numParams)
 
 public int Native_SetModeState(Handle plugin, int numParams)
 {
-	if (!ValidModeStateSize(GetNativeCell(4)))
+	if (!ValidModeStateSize(GetNativeCell(3)))
 	{
 		return view_as<int>(false);
 	}
 	any state[GOKZ_MODE_STATE_SIZE];
-	GetNativeArray(3, state, sizeof(state));
-	return view_as<int>(SetModeState(GetNativeCell(1), GetNativeCell(2), state));
+	GetNativeArray(2, state, sizeof(state));
+	return view_as<int>(SetModeState(GetNativeCell(1), state));
 }
 
 static bool ValidModeStateSize(int size)
