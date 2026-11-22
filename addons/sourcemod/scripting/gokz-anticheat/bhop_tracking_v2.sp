@@ -9,7 +9,7 @@
 void PrintBhopCheckToChat_V2(int client, int target)
 {
 	GOKZ_PrintToChat(client, true, 
-		"{orchid}[FKZ AC] {lime}%N {grey}[{lime}%d%%%% {grey}%t | {lime}%.2f {grey}%t]", 
+		"{orchid}[FKZ AC] {lime}%N {grey}[{lime}%d%% {grey}%t | {lime}%.2f {grey}%t]",
 		target, 
 		RoundFloat(GOKZ_AC_GetPerfCountV2(target, 20) * 100.0 / IntMin(gI_BhopCountV2[target], 20)), 
 		"Perfs", 

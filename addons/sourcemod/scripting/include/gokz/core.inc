@@ -295,6 +295,8 @@ enum TriggerType
 #define GOKZ_SAFEGUARD_RESTART_MIN_DELAY 0.6
 #define GOKZ_SAFEGUARD_RESTART_MAX_DELAY 5.0
 
+#define GOKZ_NAV_FILE "maps/gokz-replays.nav"
+
 // Prevents the player from retouching a trigger too often.
 #define GOKZ_MAX_RETOUCH_TRIGGER_COUNT 4
 
@@ -1631,7 +1633,7 @@ stock void GOKZ_PrintToChatAll(bool addPrefix, const char[] format, any...)
 		{
 			SetGlobalTransTarget(client);
 			VFormat(buffer, sizeof(buffer), format, 3);
-			GOKZ_PrintToChat(client, addPrefix, buffer);
+			GOKZ_PrintToChat(client, addPrefix, "%s", buffer);
 		}
 	}
 }
@@ -1655,7 +1657,7 @@ stock void GOKZ_PrintToChatSpectators(int client, bool addPrefix, const char[] f
 		{
 			SetGlobalTransTarget(target);
 			VFormat(buffer, sizeof(buffer), format, 4);
-			GOKZ_PrintToChat(target, addPrefix, buffer);
+			GOKZ_PrintToChat(target, addPrefix, "%s", buffer);
 		}
 	}
 }

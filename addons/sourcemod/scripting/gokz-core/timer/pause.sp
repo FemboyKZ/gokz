@@ -102,6 +102,15 @@ bool CanPause(int client, bool showError = false)
 			}
 			return false;
 		}
+		else if (TriggerTouchesPending(client))
+		{
+			if (showError)
+			{
+				GOKZ_PrintToChat(client, true, "%t", "Can't Pause (Generic)");
+				GOKZ_PlayErrorSound(client);
+			}
+			return false;
+		}
 	}
 	
 	return true;
@@ -248,14 +257,13 @@ void OnJoinTeam_Pause(int client, int team)
 		{
 			lastDuckValue[client] = Movement_GetDuckSpeed(client);
 			lastStaminaValue[client] = GetEntPropFloat(client, Prop_Send, "m_flStamina");
+			if (GetTimerRunning(client))
+			{
+				hasPausedInThisRun[client] = true;
+				lastPauseTime[client] = GetEngineTime();
+			}
 		}
 		paused[client] = true;
-		
-		if (GetTimerRunning(client))
-		{
-			hasPausedInThisRun[client] = true;
-			lastPauseTime[client] = GetEngineTime();
-		}
 		
 		// Call Post Forward
 		Call_GOKZ_OnPause_Post(client);

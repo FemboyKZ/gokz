@@ -992,6 +992,10 @@ static void CreateReplaysDirectory()
 	BuildPath(Path_SM, path, sizeof(path), "%s", RP_DIRECTORY_CHEATERS);
 	CreateDirectory(path, 511);
 
+	// Create imported replay directory
+	BuildPath(Path_SM, path, sizeof(path), "%s", RP_DIRECTORY_IMPORTED);
+	CreateDirectory(path, 511);
+
 	// Create jumps parent replay directory
 	BuildPath(Path_SM, path, sizeof(path), "%s", RP_DIRECTORY_JUMPS);
 	CreateDirectory(path, 511);

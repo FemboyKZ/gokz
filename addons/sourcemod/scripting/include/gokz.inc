@@ -28,6 +28,28 @@ enum ObsMode
 	ObsMode_Roaming // Free roaming
 };
 
+enum
+{
+	ChatColor_Default = 0,
+	ChatColor_TeamColor,
+	ChatColor_Red,
+	ChatColor_LightRed,
+	ChatColor_DarkRed,
+	ChatColor_BlueGrey,
+	ChatColor_Blue,
+	ChatColor_DarkBlue,
+	ChatColor_Purple,
+	ChatColor_Orchid,
+	ChatColor_Yellow,
+	ChatColor_Gold,
+	ChatColor_LightGreen,
+	ChatColor_Green,
+	ChatColor_Lime,
+	ChatColor_Grey,
+	ChatColor_Grey2,
+	CHATCOLOR_COUNT
+};
+
 
 
 // =====[ CONSTANTS ]=====
@@ -46,6 +68,48 @@ enum ObsMode
 stock float PLAYER_MINS[3] = {-16.0, -16.0, 0.0};
 stock float PLAYER_MAXS[3] = {16.0, 16.0, 72.0};
 stock float PLAYER_MAXS_DUCKED[3] = {16.0, 16.0, 54.0};
+
+stock char gC_ChatColorTags[CHATCOLOR_COUNT][] =
+{
+	"{default}",
+	"{teamcolor}",
+	"{red}",
+	"{lightred}",
+	"{darkred}",
+	"{bluegrey}",
+	"{blue}",
+	"{darkblue}",
+	"{purple}",
+	"{orchid}",
+	"{yellow}",
+	"{gold}",
+	"{lightgreen}",
+	"{green}",
+	"{lime}",
+	"{grey}",
+	"{grey2}"
+};
+
+stock char gC_ChatColorCodes[CHATCOLOR_COUNT][] =
+{
+	"\x01",
+	"\x03",
+	"\x07",
+	"\x0F",
+	"\x02",
+	"\x0A",
+	"\x0B",
+	"\x0C",
+	"\x03",
+	"\x0E",
+	"\x09",
+	"\x10",
+	"\x05",
+	"\x04",
+	"\x06",
+	"\x08",
+	"\x0D"
+};
 
 
 
@@ -330,6 +394,20 @@ stock void Color_StripFromChatText(const char[] input, char[] output, int size)
 }
 
 /**
+ * Replaces {color} tags with CS:GO chat colour codes.
+ *
+ * @param buffer			String to process in place.
+ * @param size				Size of buffer.
+ */
+stock void Color_ReplaceChatTags(char[] buffer, int size)
+{
+	for (int i = 0; i < CHATCOLOR_COUNT; i++)
+	{
+		ReplaceString(buffer, size, gC_ChatColorTags[i], gC_ChatColorCodes[i], false);
+	}
+}
+
+/**
  * Returns an integer as a string.
  *
  * @param num				Integer to stringify.
@@ -431,8 +509,11 @@ stock int Steam2ToSteamAccountID(const char[] steamID2)
  * @param client		Client index.
  * @param origin		Origin to teleport to.
  * @param angles		Eye angles to set.
+ * @param setAngles		Whether to set the eye angles.
+ * @param holdStill		Whether to hold the player still for the next 5 ticks.
+ * @param holdGravity	Gravity to set on each tick the player is held still.
  */
-stock void TeleportPlayer(int client, const float origin[3], const float angles[3], bool setAngles = true, bool holdStill = true)
+stock void TeleportPlayer(int client, const float origin[3], const float angles[3], bool setAngles = true, bool holdStill = true, float holdGravity = 1.0)
 {
 	// Clear the player's parent before teleporting to fix being
 	// teleported into seemingly random places if the player has a parent.
@@ -463,7 +544,7 @@ stock void TeleportPlayer(int client, const float origin[3], const float angles[
 		SetEntProp(client, Prop_Send, "m_CollisionGroup", GOKZ_COLLISION_GROUP_STANDARD);
 
 		// Intelligently hold player still to prevent booster and trigger exploits
-		StartHoldStill(client, ducked);
+		StartHoldStill(client, ducked, holdGravity);
 	}
 	else if (ducked)
 	{
@@ -473,13 +554,14 @@ stock void TeleportPlayer(int client, const float origin[3], const float angles[
 	delete trace;
 }
 
-static void StartHoldStill(int client, bool ducked)
+static void StartHoldStill(int client, bool ducked, float gravity)
 {
 	DataPack data = new DataPack();
 	data.WriteCell(GetClientUserId(client));
 	data.WriteCell(0); // tick counter
 	data.WriteCell(GOKZ_TP_FREEZE_TICKS); // number of ticks to hold still
 	data.WriteCell(ducked);
+	data.WriteFloat(gravity);
 	ContinueHoldStill(data);
 }
 
@@ -490,6 +572,7 @@ public void ContinueHoldStill(DataPack data)
 	int ticks = data.ReadCell();
 	int tickCount = data.ReadCell();
 	bool ducked = data.ReadCell();
+	float gravity = data.ReadFloat();
 	delete data;
 
 	if (!IsValidClient(client))
@@ -501,7 +584,7 @@ public void ContinueHoldStill(DataPack data)
 	{
 		Movement_SetVelocity(client, view_as<float>( { 0.0, 0.0, 0.0 } ));
 		Movement_SetBaseVelocity(client, view_as<float>( { 0.0, 0.0, 0.0 } ));
-		Movement_SetGravity(client, 1.0);
+		Movement_SetGravity(client, gravity);
 
 		// Don't drop the player off of ladders.
 		// The game will automatically change the movetype back to MOVETYPE_WALK if it can't find a ladder.
@@ -538,6 +621,7 @@ public void ContinueHoldStill(DataPack data)
 		data.WriteCell(ticks);
 		data.WriteCell(tickCount);
 		data.WriteCell(ducked);
+		data.WriteFloat(gravity);
 		RequestFrame(ContinueHoldStill, data);
 	}
 }

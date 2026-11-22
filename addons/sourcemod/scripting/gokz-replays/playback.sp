@@ -24,6 +24,7 @@ static int botClient[RP_MAX_BOTS];
 static bool botDataLoaded[RP_MAX_BOTS];
 static int botReplayType[RP_MAX_BOTS];
 static int botReplayVersion[RP_MAX_BOTS];
+static bool botOtherMapVersion[RP_MAX_BOTS];
 static int botSteamAccountID[RP_MAX_BOTS];
 static int botCourse[RP_MAX_BOTS];
 static int botMode[RP_MAX_BOTS];
@@ -60,6 +61,8 @@ static bool botAbandoned[RP_MAX_BOTS];
 static bool botPending[RP_MAX_BOTS];
 static Handle botPendingTimer[RP_MAX_BOTS];
 #define RP_BOT_PENDING_TIMEOUT 10.0
+
+static int spectatedBot[MAXPLAYERS + 1] = {-1, ...};
 
 
 
@@ -446,6 +449,7 @@ float GetPlaybackTime(int bot)
 
 void OnClientPutInServer_Playback(int client)
 {
+	spectatedBot[client] = -1;
 	if (!IsFakeClient(client) || IsClientSourceTV(client))
 	{
 		return;
@@ -493,6 +497,13 @@ void OnClientDisconnect_Playback(int client)
 		ClearPendingBot(bot);
 		// Stale ids would make GetBotFromClient claim a slot for a reused client index
 		botClient[bot] = 0;
+		for (int spec = 1; spec <= MaxClients; spec++)
+		{
+			if (spectatedBot[spec] == bot)
+			{
+				spectatedBot[spec] = -1;
+			}
+		}
 		botCaller[bot] = 0;
 		if (playbackTickData[bot] != null)
 		{
@@ -528,6 +539,20 @@ void OnPlayerRunCmd_Playback(int client, int &buttons, float vel[3], float angle
 
 void OnPlayerRunCmdPost_Playback(int client)
 {
+	if (!IsFakeClient(client))
+	{
+		if (GetObserverMode(client) != ObsMode_Roaming)
+		{
+			int watchedBot = GetBotFromClient(GetObserverTarget(client));
+			if (watchedBot != -1 && watchedBot != spectatedBot[client] && botInGame[watchedBot] && botOtherMapVersion[watchedBot])
+			{
+				GOKZ_PrintToChat(client, true, "%t", "Other Map Version Warning");
+			}
+			spectatedBot[client] = watchedBot;
+		}
+		return;
+	}
+
 	for (int bot; bot < RP_MAX_BOTS; bot++)
 	{
 		// Check if not the bot we're looking for
@@ -655,7 +680,10 @@ static bool LoadFormatVersion1Replay(File file, int bot)
 	file.ReadInt32(botCourse[bot]);
 	file.ReadInt32(botMode[bot]);
 	file.ReadInt32(botStyle[bot]);
-	
+
+	// Old replays don't store the map file size
+	botOtherMapVersion[bot] = false;
+
 	// Old replays don't store the weapon information
 	botKnife[bot] = CS_WeaponIDToItemDefIndex(CSWeapon_KNIFE);
 	botWeapon[bot] = (botMode[bot] == Mode_Vanilla) ? -1 : CS_WeaponIDToItemDefIndex(CSWeapon_USP_SILENCER);
@@ -757,6 +785,8 @@ static bool LoadFormatVersion2Replay(File file, int client, int bot)
 	// Map filesize
 	int mapFileSize;
 	file.ReadInt32(mapFileSize);
+	// FileSize gives -1 when the map file isn't found, so only known sizes are compared
+	botOtherMapVersion[bot] = mapFileSize > 0 && gI_CurrentMapFileSize > 0 && mapFileSize != gI_CurrentMapFileSize;
 
 	// Server IP
 	int serverIP;

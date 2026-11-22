@@ -11,7 +11,6 @@
 #include <movementapi>
 
 #include <autoexecconfig>
-#include <sourcemod-colors>
 
 #undef REQUIRE_EXTENSIONS
 #undef REQUIRE_PLUGIN
@@ -58,6 +57,7 @@ ConVar gCV_sv_full_alltalk;
 #include "gokz-core/teamnumfix.sp"
 #include "gokz-core/particles.sp"
 #include "gokz-core/playerstate.sp"
+#include "gokz-core/nav.sp"
 
 #include "gokz-core/map/buttons.sp"
 #include "gokz-core/map/triggers.sp"
@@ -107,6 +107,7 @@ public void OnPluginStart()
 	HookEvents();
 	RegisterCommands();
 	
+	OnPluginStart_UseButtons(); // Before OnPluginStart_Triggerfix, whose late-load loop hooks clients
 	OnPluginStart_MapTriggers();
 	OnPluginStart_MapButtons();
 	OnPluginStart_MapStarts();
@@ -155,6 +156,7 @@ public void OnClientPutInServer(int client)
 	OnClientPutInServer_Triggerfix(client);
 	OnClientPutInServer_Noclip(client);
 	OnClientPutInServer_Turnbinds(client);
+	OnClientPutInServer_UseButtons(client);
 	HookClientEvents(client);
 }
 
@@ -257,14 +259,10 @@ public void Hook_PlayerSpawnPost(int client)
 	}
 }
 
-public void Hook_PlayerPreThinkPost(int client)
-{
-	OnClientPreThinkPost_UseButtons(client);
-}
-
 public void Hook_PlayerPostThink(int client)
 {
 	Hook_PlayerPostThink_Triggerfix(client);
+	Hook_PlayerPostThink_JoinTeam(client);
 	Hook_PlayerPostThink_MapZones(client); // After triggerfix, which can touch start zones
 }
 
@@ -335,6 +333,7 @@ public void GOKZ_OnJoinTeam(int client, int team)
 
 public void OnMapStart()
 {
+	OnMapStart_Nav();
 	OnMapStart_MapTriggers();
 	OnMapStart_KZConfig();
 	OnMapStart_Options();
@@ -514,7 +513,6 @@ static void HookClientEvents(int client)
 {
 	DHookEntity(gH_DHooks_OnTeleport, true, client);
 	DHookEntity(gH_DHooks_SetModel, true, client);
-	SDKHook(client, SDKHook_PreThinkPost, Hook_PlayerPreThinkPost);
 	SDKHook(client, SDKHook_PostThink, Hook_PlayerPostThink);
 	SDKHook(client, SDKHook_PostThinkPost, Hook_PlayerPostThinkPost);
 	SDKHook(client, SDKHook_SpawnPost, Hook_PlayerSpawnPost);

@@ -289,9 +289,38 @@ static bool hasSavedPosition[MAXPLAYERS + 1];
 static float savedOrigin[MAXPLAYERS + 1][3];
 static float savedAngles[MAXPLAYERS + 1][3];
 static bool savedOnLadder[MAXPLAYERS + 1];
+static int savedHealth[MAXPLAYERS + 1];
+static int savedWeaponSlot[MAXPLAYERS + 1];
+static bool triggerTouchesPending[MAXPLAYERS + 1];
+static int triggerTouchesPendingTick[MAXPLAYERS + 1];
+
+// Client commands run before usercmds, so touches are stale until the player's next command
+bool TriggerTouchesPending(int client)
+{
+	return triggerTouchesPending[client];
+}
+
+void Hook_PlayerPostThink_JoinTeam(int client)
+{
+	if (!triggerTouchesPending[client])
+	{
+		return;
+	}
+
+	// The hold-still's no-trigger collision group keeps touches stale while it lasts,
+	// and the tick bound stops waiting if something else keeps the player in that
+	// group, such as gokz-saveloc restoring a saved collision group
+	if (GetEntProp(client, Prop_Send, "m_CollisionGroup") != GOKZ_COLLISION_GROUP_NOTRIGGER
+		 || GetGameTickCount() - triggerTouchesPendingTick[client] > GOKZ_TP_FREEZE_TICKS)
+	{
+		triggerTouchesPending[client] = false;
+	}
+}
 
 void OnClientPutInServer_JoinTeam(int client)
 {
+	triggerTouchesPending[client] = false;
+
 	// Automatically put the player on a team if he doesn't choose one.
 	// The mp_force_pick_time convar is the built in way to do this, but that obviously
 	// does not call GOKZ_JoinTeam which includes a fix for spawning in the void when
@@ -338,6 +367,9 @@ void JoinTeam(int client, int newTeam, bool restorePos, bool forceBroadcast = fa
 			player.GetOrigin(savedOrigin[client]);
 			player.GetEyeAngles(savedAngles[client]);
 			savedOnLadder[client] = player.Movetype == MOVETYPE_LADDER;
+			// Observer mode sets health to 0 and removes weapons
+			savedHealth[client] = GetClientHealth(client);
+			savedWeaponSlot[client] = GetActiveWeaponSlot(client);
 			hasSavedPosition[client] = true;
 		}
 
@@ -351,15 +383,39 @@ void JoinTeam(int client, int newTeam, bool restorePos, bool forceBroadcast = fa
 	else if (newTeam == CS_TEAM_CT && currentTeam != CS_TEAM_CT
 		 || newTeam == CS_TEAM_T && currentTeam != CS_TEAM_T)
 	{
+		// Read late, since map outputs can still change these while the player spectates
+		float gravity = player.Gravity;
+		float laggedMovement = GetEntPropFloat(client, Prop_Send, "m_flLaggedMovementValue");
+		float velocityModifier = player.VelocityModifier;
+
 		ForcePlayerSuicide(client);
 		CS_SwitchTeam(client, newTeam);
 		CS_RespawnPlayer(client);
 		if (restorePos && hasSavedPosition[client])
 		{
-			TeleportPlayer(client, savedOrigin[client], savedAngles[client]);
+			TeleportPlayer(client, savedOrigin[client], savedAngles[client], .holdGravity = gravity);
+			triggerTouchesPending[client] = true;
+			triggerTouchesPendingTick[client] = GetGameTickCount();
+			SetEntPropFloat(client, Prop_Send, "m_flLaggedMovementValue", laggedMovement);
+			player.VelocityModifier = velocityModifier;
+			if (savedHealth[client] > 0)
+			{
+				SetEntityHealth(client, savedHealth[client]);
+			}
 			if (savedOnLadder[client])
 			{
 				player.Movetype = MOVETYPE_LADDER;
+			}
+			// The respawn gives new weapon entities, so find the held one again by its slot
+			if (savedWeaponSlot[client] != -1)
+			{
+				int weapon = GetPlayerWeaponSlot(client, savedWeaponSlot[client]);
+				if (weapon != -1)
+				{
+					char classname[64];
+					GetEntityClassname(weapon, classname, sizeof(classname));
+					FakeClientCommand(client, "use %s", classname);
+				}
 			}
 		}
 		else
@@ -379,6 +435,23 @@ void JoinTeam(int client, int newTeam, bool restorePos, bool forceBroadcast = fa
 	{
 		Call_GOKZ_OnJoinTeam(client, newTeam);
 	}
+}
+
+static int GetActiveWeaponSlot(int client)
+{
+	int activeWeapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+	if (activeWeapon == -1)
+	{
+		return -1;
+	}
+	for (int slot = CS_SLOT_PRIMARY; slot <= CS_SLOT_C4; slot++)
+	{
+		if (GetPlayerWeaponSlot(client, slot) == activeWeapon)
+		{
+			return slot;
+		}
+	}
+	return -1;
 }
 
 void SendFakeTeamEvent(int client)
@@ -626,182 +699,74 @@ void OnMapStart_FixMissingSpawns()
 
 // =====[ BUTTONS ]=====
 
-void OnClientPreThinkPost_UseButtons(int client)
+static Handle H_FindUseEntity;
+static int gI_CollisionGroupOffset;
+static int gI_MoveParentOffset;
+static int gI_SavedCollisionGroup[MAXPLAYERS + 1] = {-1, ...};
+
+void OnPluginStart_UseButtons()
 {
-	if (IsPlayerAlive(client) && GOKZ_GetCoreOption(client, Option_ButtonThroughPlayers) == ButtonThroughPlayers_Enabled && GetEntProp(client, Prop_Data, "m_afButtonPressed") & IN_USE)
+	GameData gamedataConf = new GameData("gokz-core.games");
+	if (gamedataConf == null)
 	{
-		int entity = FindUseEntity(client);
-		if (entity != -1)
+		SetFailState("Failed to load gokz-core gamedata");
+	}
+	int offset = gamedataConf.GetOffset("CCSPlayer::FindUseEntity");
+	delete gamedataConf;
+	if (offset == -1)
+	{
+		SetFailState("Failed to get CCSPlayer::FindUseEntity offset");
+	}
+	H_FindUseEntity = DHookCreate(offset, HookType_Entity, ReturnType_CBaseEntity, ThisPointer_CBaseEntity);
+
+	gI_CollisionGroupOffset = FindSendPropInfo("CBaseEntity", "m_CollisionGroup");
+	if (gI_CollisionGroupOffset <= 0)
+	{
+		SetFailState("Failed to find m_CollisionGroup");
+	}
+	gI_MoveParentOffset = FindSendPropInfo("CBaseEntity", "moveparent");
+	if (gI_MoveParentOffset <= 0)
+	{
+		SetFailState("Failed to find moveparent");
+	}
+}
+
+void OnClientPutInServer_UseButtons(int client)
+{
+	DHookEntity(H_FindUseEntity, false, client, _, DHooks_OnFindUseEntity);
+	DHookEntity(H_FindUseEntity, true, client, _, DHooks_OnFindUseEntityPost);
+}
+
+// The engine's +use button traces skip collision group 1 (COLLISION_GROUP_DEBRIS), so other players are switched to that group while it traces a target.
+public MRESReturn DHooks_OnFindUseEntity(int client, DHookReturn hReturn)
+{
+	if (GOKZ_GetCoreOption(client, Option_ButtonThroughPlayers) != ButtonThroughPlayers_Enabled)
+	{
+		return MRES_Ignored;
+	}
+	for (int other = 1; other <= MaxClients; other++)
+	{
+		// A player parented to a usable entity is itself usable, so it keeps its group.
+		if (other != client && IsClientInGame(other) && GetEntDataEnt2(other, gI_MoveParentOffset) == -1)
 		{
-			AcceptEntityInput(entity, "Use", client, client, 1);
+			gI_SavedCollisionGroup[other] = GetEntData(other, gI_CollisionGroupOffset);
+			SetEntData(other, gI_CollisionGroupOffset, GOKZ_COLLISION_GROUP_NOTRIGGER);
 		}
 	}
+	return MRES_Ignored;
 }
 
-static int FindUseEntity(int client)
+public MRESReturn DHooks_OnFindUseEntityPost(int client, DHookReturn hReturn)
 {
-	float fwd[3];
-	float angles[3];
-	GetClientEyeAngles(client, angles);
-	GetAngleVectors(angles, fwd, NULL_VECTOR, NULL_VECTOR);
-
-	Handle trace;
-
-	float eyeOrigin[3];
-	GetClientEyePosition(client, eyeOrigin);
-	int useableContents = (MASK_NPCSOLID_BRUSHONLY | MASK_OPAQUE_AND_NPCS) & ~CONTENTS_OPAQUE;
-
-	float endpos[3];
-
-	// Check if +use trace collide with a player first, so we don't activate any button twice
-	trace = TR_TraceRayFilterEx(eyeOrigin, angles, useableContents, RayType_Infinite, TRFOtherPlayersOnly, client);
-	bool hitPlayer = TR_DidHit(trace);
-	int hitEntity = TR_GetEntityIndex(trace);
-	delete trace;
-	if (hitPlayer && 0 < hitEntity <= MaxClients)
+	for (int other = 1; other <= MaxClients; other++)
 	{
-		// Search for a button behind it.
-		trace = TR_TraceRayFilterEx(eyeOrigin, angles, useableContents, RayType_Infinite, TraceEntityFilterPlayers);
-		bool hitBehind = TR_DidHit(trace);
-		int ent = TR_GetEntityIndex(trace);
-		TR_GetEndPosition(endpos, trace);
-		delete trace;
-		if (hitBehind)
+		if (gI_SavedCollisionGroup[other] != -1)
 		{
-			char buffer[20];
-			// Make sure that it is a button, and this button activates when pressed.
-			// If it is not a button, check its parent to see if it is a button.
-			bool isButton;
-			while (ent != -1)
-			{
-				GetEntityClassname(ent, buffer, sizeof(buffer));
-				if (StrEqual("func_button", buffer, false) && GetEntProp(ent, Prop_Data, "m_spawnflags") & SF_BUTTON_USE_ACTIVATES)
-				{
-					isButton = true;
-					break;
-				}
-				else
-				{
-					ent = GetEntPropEnt(ent, Prop_Data, "m_hMoveParent");
-				}
-			}
-			if (isButton)
-			{
-				float delta[3];
-				for (int i = 0; i < 2; i++)
-				{
-					delta[i] = endpos[i] - eyeOrigin[i];
-				}
-				// Z distance is treated differently.
-				float m_vecMins[3];
-				float m_vecMaxs[3];
-				float m_vecOrigin[3];
-				GetEntPropVector(client, Prop_Send, "m_vecOrigin", m_vecOrigin);
-				GetEntPropVector(client, Prop_Send, "m_vecMins", m_vecMins);
-				GetEntPropVector(client, Prop_Send, "m_vecMaxs", m_vecMaxs);
-
-				delta[2] = IntervalDistance(endpos[2], m_vecOrigin[2] + m_vecMins[2], m_vecOrigin[2] + m_vecMaxs[2]);
-				if (GetVectorLength(delta) < 80.0)
-				{
-					return ent;
-				}
-			}
+			SetEntData(other, gI_CollisionGroupOffset, gI_SavedCollisionGroup[other]);
+			gI_SavedCollisionGroup[other] = -1;
 		}
 	}
-	
-	int nearestEntity = -1;
-	float nearestPoint[3];
-	float nearestDist = FLOAT_MAX;
-	ArrayList entities = new ArrayList();
-	TR_EnumerateEntitiesSphere(eyeOrigin, 80.0, 1<<5, AddEntities, entities);
-	for (int i = 0; i < entities.Length; i++)
-	{
-		char buffer[64];
-		int ent = entities.Get(i);
-		GetEntityClassname(ent, buffer, sizeof(buffer));
-		// Check if the entity is a button and it is pressable.
-		if (StrEqual("func_button", buffer, false) && GetEntProp(ent, Prop_Data, "m_spawnflags") & SF_BUTTON_USE_ACTIVATES)
-		{
-			float point[3];
-			CalcNearestPoint(ent, eyeOrigin, point);
-						
-			float dir[3];
-			for (int j = 0; j < 3; j++)
-			{
-				dir[j] = point[j] - eyeOrigin[j];
-			}
-			// Check the maximum angle the player can be away from the button.
-			float minimumDot = GetEntPropFloat(ent, Prop_Send, "m_flUseLookAtAngle");
-			NormalizeVector(dir, dir);
-			float dot = GetVectorDotProduct(dir, fwd);
-			if (dot < minimumDot)
-			{
-				continue;
-			}
-
-			float dist = CalcDistanceToLine(point, eyeOrigin, fwd);
-			if (dist < nearestDist)
-			{
-				trace = TR_TraceRayFilterEx(eyeOrigin, point, useableContents, RayType_EndPoint, TraceEntityFilterPlayers);
-				bool reachable = TR_GetFraction(trace) == 1.0 || TR_GetEntityIndex(trace) == ent;
-				delete trace;
-				if (reachable)
-				{
-					CopyVector(point, nearestPoint);
-					nearestDist = dist;
-					nearestEntity = ent;
-				}
-			}
-		}
-	}
-	delete entities;
-	if (nearestEntity == -1)
-	{
-		return -1;
-	}
-	// We found the closest button, but we still need to check if there is a player in front of it or not.
-	// In the case that there isn't a player inbetween, we don't return the entity index, because that button will be pressed by the game function anyway.
-	// If there is, we will press two buttons at once, the "right" button found by this function and the "wrong" button that we only happen to press because
-	// there is a player in the way.
-	
-	trace = TR_TraceRayFilterEx(eyeOrigin, nearestPoint, useableContents, RayType_EndPoint, TRFOtherPlayersOnly, client);
-	bool playerInWay = TR_DidHit(trace);
-	delete trace;
-	if (playerInWay)
-	{
-		return nearestEntity;
-	}
-	return -1; 
-}
-
-public bool AddEntities(int entity, ArrayList entities)
-{
-	entities.Push(entity);
-	return true;
-}
-
-static float IntervalDistance(float x, float x0, float x1)
-{
-	if (x0 > x1)
-	{
-		float tmp = x0;
-		x0 = x1;
-		x1 = tmp;
-	}
-	if (x < x0)
-	{
-		return x0 - x;
-	}
-	else if (x > x1)
-	{
-		return x - x1;
-	}
-	return 0.0;
-}
-// TraceRay filter for other players exclusively.
-public bool TRFOtherPlayersOnly(int entity, int contentmask, int client)
-{
-	return (0 < entity <= MaxClients) && (entity != client);
+	return MRES_Ignored;
 }
 
 // =====[ SAFE MODE ]=====
