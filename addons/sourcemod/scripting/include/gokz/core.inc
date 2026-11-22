@@ -1454,7 +1454,8 @@ native void GOKZ_SetValidJumpOrigin(int client, const float origin[3]);
  * @param client		Client index.
  * @param state			Buffer to store the state in.
  * @param size			Size of the buffer, must be GOKZ_PLAYER_STATE_SIZE.
- * @return				Whether the state fit in the buffer.
+ * @return				Whether the touched triggers fit in the buffer.
+ *						A sequential bhop section too long for it keeps its newest triggers.
  */
 native bool GOKZ_GetPlayerState(int client, any[] state, int size = GOKZ_PLAYER_STATE_SIZE);
 

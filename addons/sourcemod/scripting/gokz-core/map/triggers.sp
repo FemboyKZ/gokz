@@ -136,8 +136,9 @@ bool GetMapTriggersState(int client, any[] state, int cell, int size)
 	}
 	
 	// Only membership is checked, and the list gets an entry per takeoff.
+	// Newest first: on a section too long for the state, the oldest triggers are left out.
 	int sequentialStart = cell;
-	for (int i = 0; i < lastTouchSequentialBhopEntRefs[client].Length; i++)
+	for (int i = lastTouchSequentialBhopEntRefs[client].Length - 1; i >= 0 && cell + 2 <= size; i--)
 	{
 		int index = EntRefToEntIndex(lastTouchSequentialBhopEntRefs[client].Get(i));
 		bool seen = false;
@@ -145,16 +146,11 @@ bool GetMapTriggersState(int client, any[] state, int cell, int size)
 		{
 			seen = state[j] == index;
 		}
-		if (seen)
+		if (!seen)
 		{
-			continue;
+			state[cell++] = index;
+			state[cell++] = GetEntityHammerID(index);
 		}
-		if (cell + 2 > size)
-		{
-			return false;
-		}
-		state[cell++] = index;
-		state[cell++] = GetEntityHammerID(index);
 	}
 	state[counts + 1] = (cell - sequentialStart) / 2;
 	return true;
@@ -192,10 +188,11 @@ void SetMapTriggersState(int client, const any[] state, int cell)
 		}
 	}
 	
+	// Stored newest first: pushed oldest first, so the next state leaves out the oldest again.
 	lastTouchSequentialBhopEntRefs[client].Clear();
-	for (int i = 0; i < sequentialCount; i++, cell += 2)
+	for (int i = sequentialCount - 1; i >= 0; i--)
 	{
-		int entRef = FindTrigger(state[cell], state[cell + 1]);
+		int entRef = FindTrigger(state[cell + 2 * i], state[cell + 2 * i + 1]);
 		if (entRef != INVALID_ENT_REFERENCE)
 		{
 			lastTouchSequentialBhopEntRefs[client].Push(entRef);
